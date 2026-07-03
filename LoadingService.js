@@ -615,6 +615,23 @@ function applyBranchColors_(sheet, startRow, branchIndex, rows) {
   sheet.getRange(startRow, branchIndex, rows.length, 1).setBackgrounds(backgrounds);
 }
 
+function applyExistingBranchColors_(sheet, headers) {
+  var branchIndex = headers.indexOf('Branch') + 1;
+  var lastRow = sheet.getLastRow();
+
+  if (branchIndex < 1 || lastRow < 2) return;
+
+  var values = sheet.getRange(2, branchIndex, lastRow - 1, 1).getValues();
+  var backgrounds = values.map(function(row) {
+    var branch = String(row[0] || '').trim().toUpperCase();
+    if (branch === 'NY') return ['#d9ead3'];
+    if (branch === 'CA') return ['#d9eaf7'];
+    return ['#ffffff'];
+  });
+
+  sheet.getRange(2, branchIndex, backgrounds.length, 1).setBackgrounds(backgrounds);
+}
+
 function getTextColumnIndexes_(headers) {
   var indexes = [];
 
@@ -677,7 +694,10 @@ function ensureTripReportsSheet_(sheetName) {
     sheet.deleteColumn(modeColumn + 1);
   }
 
-  return ensureSheetWithHeaders_(sheetName, TRIP_REPORT_HEADERS);
+  sheet = ensureSheetWithHeaders_(sheetName, TRIP_REPORT_HEADERS);
+  applyExistingBranchColors_(sheet, TRIP_REPORT_HEADERS);
+
+  return sheet;
 }
 
 function getRequiredSheet_(sheetName) {
