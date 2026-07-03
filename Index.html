@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --border: #d6dbe1;
+      --text: #17212b;
+      --muted: #5f6b7a;
+      --blue: #1a73e8;
+      --green: #0b8043;
+      --red: #b3261e;
+      --orange: #b06000;
+      --bg: #f5f7fa;
+      --panel: #ffffff;
+      --started: #fff4ce;
+      --completed: #d9ead3;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      font-size: 14px;
+    }
+
+    .app {
+      max-width: 100%;
+      margin: 0 auto;
+      padding: 10px;
+    }
+
+    h1 { margin: 0 0 10px; font-size: 22px; }
+    h2 { margin: 0 0 10px; font-size: 17px; }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .login-shell {
+      max-width: 760px;
+      margin: 0 auto;
+      padding-top: 10px;
+    }
+
+    .form-grid { display: grid; gap: 10px; }
+
+    label {
+      display: grid;
+      gap: 5px;
+      font-weight: 700;
+    }
+
+    input, select, button {
+      min-height: 40px;
+      border: 1px solid #aeb7c2;
+      border-radius: 4px;
+      padding: 8px 10px;
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+      font-weight: 700;
+      background: #fff;
+    }
+
+    button.primary { border-color: var(--blue); background: var(--blue); color: #fff; }
+    button.save { border-color: var(--green); background: var(--green); color: #fff; }
+    button:disabled { cursor: not-allowed; opacity: 0.65; }
+
+    .status {
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 9px 10px;
+      margin-bottom: 10px;
+      background: #eef4ff;
+      color: #174ea6;
+      font-weight: 700;
+    }
+
+    .status.error { background: #fce8e6; border-color: #f4b6af; color: var(--red); }
+    .status.success { background: #e6f4ea; border-color: #b7dfc1; color: var(--green); }
+    .status.warning { background: #fff8e1; border-color: #f3d37a; color: var(--orange); }
+    .hidden { display: none; }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      background: var(--bg);
+      padding: 0 0 8px;
+    }
+
+    .topbar input, .topbar select { min-width: 150px; }
+    .topbar .grow { flex: 1; min-width: 190px; }
+
+    .context {
+      font-weight: 700;
+      color: var(--muted);
+      margin: 0 0 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 7px;
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    th { background: #f1f3f4; font-weight: 700; }
+    tr.started-row td { background: var(--started); }
+    tr.completed-row td { background: var(--completed); }
+
+    .stats th, .stats td { white-space: nowrap; }
+
+    .stats tr.total-row td {
+      border-top: 3px solid #4a4f55;
+      font-weight: 700;
+    }
+
+    .orders-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      background: #fff;
+    }
+
+    .orders th, .orders td { white-space: nowrap; }
+    .orders .title { white-space: normal; min-width: 280px; font-weight: 700; }
+    .orders .progress { min-width: 110px; font-weight: 700; }
+
+    .id-red { color: #d1003f; font-weight: 700; }
+    .id-yellow { color: #a66a00; font-weight: 700; }
+    .id-green { color: #188038; font-weight: 700; }
+
+    .stepper {
+      display: inline-grid;
+      grid-template-columns: 34px 58px 34px;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .stepper button { min-height: 34px; padding: 5px; font-size: 16px; }
+    .stepper input { min-height: 34px; width: 58px; text-align: center; padding: 5px; }
+
+    .pieces-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      padding: 8px;
+    }
+
+    .piece-toggle {
+      min-width: 82px;
+      min-height: 42px;
+      background: #fff;
+    }
+
+    .piece-toggle.loaded {
+      background: #d9ead3;
+      border-color: #94c47d;
+    }
+
+    .close-trip {
+      width: min(100%, 360px);
+      min-height: 56px;
+      font-size: 16px;
+      margin-top: 10px;
+    }
+
+    .open-pieces {
+      min-width: 64px;
+      border-color: #6b8bb8;
+      background: #eef4ff;
+      color: #174ea6;
+    }
+
+    .badge {
+      display: inline-block;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 3px 6px;
+      font-size: 12px;
+      font-weight: 700;
+      background: #fff;
+    }
+
+    .badge.pending { color: var(--orange); border-color: #f3c16d; background: #fff8e1; }
+    .badge.completed { color: var(--green); border-color: #b7dfc1; background: #e6f4ea; }
+    .badge.started { color: #8a5a00; border-color: #f3d37a; background: #fff8e1; }
+    .badge.trip { color: #174ea6; border-color: #a8c7fa; background: #e8f0fe; }
+    .badge.req { color: #8a5a00; border-color: #e7d8ad; background: #fbf3df; }
+
+    .placeholder {
+      border: 1px dashed #aeb7c2;
+      border-radius: 6px;
+      padding: 14px;
+      color: var(--muted);
+      font-weight: 700;
+      background: #fff;
+    }
+
+    @media (max-width: 720px) {
+      .app { padding: 6px; font-size: 12px; }
+      h1 { font-size: 18px; }
+      input, select, button { min-height: 38px; }
+      .topbar { display: grid; grid-template-columns: 1fr 1fr; }
+      .topbar .grow { grid-column: 1 / -1; width: 100%; }
+      .stats { font-size: 11px; }
+      th, td { padding: 5px; }
+      .orders .title { min-width: 190px; }
+      .orders .hide-mobile { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <div id="auth-shell" class="login-shell">
+      <h1>Warehouse Control</h1>
+      <div id="status" class="status hidden"></div>
+
+      <section id="login-panel" class="panel">
+        <h2>Login</h2>
+        <div class="form-grid">
+          <label>Username <input id="username" autocomplete="username" inputmode="text"></label>
+          <label>Password <input id="password" type="password" autocomplete="current-password"></label>
+          <button id="login-button" class="primary" onclick="loginUser()">Login</button>
+        </div>
+      </section>
+
+      <section id="selector-panel" class="panel hidden">
+        <h2>Start workflow</h2>
+        <div class="form-grid">
+          <label>Workflow <select id="workflow"></select></label>
+          <label>Truck <select id="truck"></select></label>
+          <button class="primary" onclick="openDashboard()">Open dashboard</button>
+        </div>
+      </section>
+    </div>
+
+    <section id="dashboard-panel" class="hidden">
+      <h1 id="dashboard-title">Dashboard</h1>
+      <div id="app-status" class="status hidden"></div>
+
+      <div class="topbar">
+        <input id="search" class="grow loading-filter" placeholder="Search" oninput="renderOrders()">
+        <select id="color-filter" class="loading-filter" onchange="renderOrders()">
+          <option value="">All colors</option>
+          <option value="red">Red</option>
+          <option value="yellow">Yellow</option>
+          <option value="green">Green</option>
+        </select>
+        <select id="status-filter" class="loading-filter" onchange="renderOrders()">
+          <option value="">All statuses</option>
+          <option value="Requires Pieces">Req.Pcs</option>
+          <option value="Not Started">Not started</option>
+          <option value="Started">Started</option>
+          <option value="Completed">Completed</option>
+        </select>
+        <button class="loading-only" onclick="loadLoadingData()">Refresh</button>
+        <button id="save-button" class="save loading-only" onclick="savePendingChanges()">Save</button>
+        <button id="generate-trip-button" class="primary loading-only" onclick="generateTrip()">Generate Trip</button>
+        <button onclick="changeWorkflow()">Change</button>
+        <button onclick="logout()">Logout</button>
+      </div>
+
+      <div id="context" class="context"></div>
+      <div id="trip-confirmation" class="panel hidden"></div>
+
+      <section id="loading-workflow" class="hidden">
+        <h2>Weight / Volume stats</h2>
+        <div class="orders-wrap">
+          <table class="stats">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Initial Weight</th>
+                <th>Loaded Weight</th>
+                <th>Remain Weight</th>
+                <th>Initial Volume</th>
+                <th>Loaded Volume</th>
+                <th>Remain Volume</th>
+              </tr>
+            </thead>
+            <tbody id="stats-body"></tbody>
+          </table>
+        </div>
+
+        <h2>Orders</h2>
+        <div class="orders-wrap">
+          <table class="orders">
+            <thead>
+              <tr>
+                <th>Progress</th>
+                <th>Pieces Detail</th>
+                <th>ID</th>
+                <th>Title</th>
+                <th>Pieces</th>
+                <th>Zone</th>
+                <th>Date</th>
+                <th class="hide-mobile">Volume</th>
+                <th class="hide-mobile">Weight</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="orders-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="unloading-workflow" class="hidden">
+        <h2>Unload Trip</h2>
+        <div class="panel">
+          <div class="form-grid">
+            <label>
+              TripID
+              <select id="unloading-trip"></select>
+            </label>
+            <button id="open-trip-button" class="primary" onclick="openUnloadingTrip()">Open Trip</button>
+          </div>
+        </div>
+
+        <div id="unloading-trip-panel" class="hidden">
+          <div id="unloading-trip-meta" class="context"></div>
+          <div class="context">White = not received. Green = received. Unmarked pieces are saved as missing on Close Trip.</div>
+          <div class="orders-wrap">
+            <table class="orders">
+              <thead>
+                <tr>
+                  <th>OrderID</th>
+                  <th>Title</th>
+                  <th>Expected</th>
+                  <th>Pieces</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="unloading-orders-body"></tbody>
+            </table>
+          </div>
+          <div class="toolbar">
+            <button id="close-trip-button" class="primary close-trip" onclick="closeUnloadingTrip()">Close Trip</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="placeholder-workflow" class="placeholder hidden"></section>
+    </section>
+  </main>
+
+  <script>
+    const SESSION_KEY = 'warehouse-control:v1:session';
+
+    let initialData = null;
+    let currentUser = null;
+    let currentSession = null;
+    let loadingData = { orders: [], stats: [] };
+    let openedOrders = {};
+    let piecesCache = {};
+    let pendingPieceUpdates = {};
+    let pendingUnknownUpdates = {};
+    let pendingPiecesInputs = {};
+    let unloadingTrips = [];
+    let unloadingTripData = null;
+    let unloadingState = {};
+
+    document.addEventListener('DOMContentLoaded', init);
+
+    function init() {
+      showStatus('Loading...');
+
+      google.script.run
+        .withSuccessHandler(data => {
+          initialData = data;
+          restoreSession();
+          hideStatus();
+        })
+        .withFailureHandler(err => showStatus(getErrorMessage(err), 'error'))
+        .getInitialData();
+    }
+
+    function loginUser() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+
+      setLoginDisabled(true);
+      showStatus('Checking login...');
+
+      google.script.run
+        .withSuccessHandler(user => {
+          currentUser = user;
+          setLoginDisabled(false);
+          hideStatus();
+          renderWorkflowSelector(user.workflows);
+          showAuthPanel('selector-panel');
+        })
+        .withFailureHandler(err => {
+          setLoginDisabled(false);
+          showStatus(getErrorMessage(err), 'error');
+        })
+        .login(username, password);
+    }
+
+    function renderWorkflowSelector(workflows) {
+      const workflowSelect = document.getElementById('workflow');
+      const truckSelect = document.getElementById('truck');
+
+      workflowSelect.innerHTML = workflows
+        .map(workflow => `<option value="${escapeAttr(workflow.key)}">${escapeHtml(workflow.label)}</option>`)
+        .join('');
+
+      renderTruckOptions();
+      workflowSelect.onchange = renderTruckOptions;
+
+      function renderTruckOptions() {
+        const workflow = getSelectedWorkflow();
+        truckSelect.innerHTML = workflow.trucks
+          .map(truck => `<option value="${escapeAttr(truck)}">${escapeHtml(truck)}</option>`)
+          .join('');
+      }
+    }
+
+    function openDashboard() {
+      if (!currentUser) {
+        showStatus('Please login first.', 'error');
+        showAuthPanel('login-panel');
+        return;
+      }
+
+      const workflow = getSelectedWorkflow();
+      const truck = document.getElementById('truck').value;
+
+      currentSession = {
+        username: currentUser.username,
+        workflow,
+        truck,
+        savedAt: new Date().toISOString(),
+      };
+
+      localStorage.setItem(SESSION_KEY, JSON.stringify(currentSession));
+      renderDashboard();
+    }
+
+    function renderDashboard() {
+      const workflow = currentSession.workflow;
+
+      document.getElementById('auth-shell').classList.add('hidden');
+      document.getElementById('dashboard-panel').classList.remove('hidden');
+      document.getElementById('dashboard-title').textContent = workflow.label;
+      document.getElementById('context').textContent =
+        `User: ${currentSession.username} | Branch: ${workflow.branch} | Mode: ${titleCase(workflow.mode)} | Truck: ${currentSession.truck} | Version: ${initialData && initialData.version ? initialData.version : 'local'}`;
+
+      if (workflow.mode === 'loading') {
+        setLoadingToolbarVisible(true);
+        document.getElementById('loading-workflow').classList.remove('hidden');
+        document.getElementById('unloading-workflow').classList.add('hidden');
+        document.getElementById('placeholder-workflow').classList.add('hidden');
+        restorePendingQueue();
+        loadLoadingData();
+      } else {
+        setLoadingToolbarVisible(false);
+        document.getElementById('loading-workflow').classList.add('hidden');
+        document.getElementById('unloading-workflow').classList.remove('hidden');
+        document.getElementById('placeholder-workflow').classList.add('hidden');
+        loadUnloadingTrips();
+      }
+    }
+
+    function setLoadingToolbarVisible(visible) {
+      document.querySelectorAll('.loading-only').forEach(item => {
+        item.classList.toggle('hidden', !visible);
+      });
+      document.querySelectorAll('.loading-filter').forEach(item => {
+        item.classList.toggle('hidden', !visible);
+      });
+    }
+
+    function loadUnloadingTrips() {
+      setAppStatus('Loading trips...');
+
+      google.script.run
+        .withSuccessHandler(data => {
+          unloadingTrips = data.trips || [];
+          renderUnloadingTrips();
+          setAppStatus(unloadingTrips.length ? 'Trips loaded' : 'No trips found for this route', unloadingTrips.length ? 'success' : 'warning');
+        })
+        .withFailureHandler(err => setAppStatus(getErrorMessage(err), 'error'))
+        .getUnloadingTrips(currentSession.workflow.key);
+    }
+
+    function renderUnloadingTrips() {
+      const select = document.getElementById('unloading-trip');
+      const openButton = document.getElementById('open-trip-button');
+      select.innerHTML = unloadingTrips.length
+        ? unloadingTrips.map(trip => `
+          <option value="${escapeAttr(trip.tripId)}">
+            ${escapeHtml(trip.tripId)} | ${escapeHtml(trip.truck)} | Orders: ${escapeHtml(trip.orders)} | Pieces: ${escapeHtml(trip.expectedPieces)}
+          </option>
+        `).join('')
+        : '<option value="">No trips</option>';
+      select.disabled = !unloadingTrips.length;
+      openButton.disabled = !unloadingTrips.length;
+    }
+
+    function openUnloadingTrip() {
+      const tripId = document.getElementById('unloading-trip').value;
+      if (!tripId) {
+        setAppStatus('Select TripID first.', 'error');
+        return;
+      }
+
+      setAppStatus('Opening trip...');
+      google.script.run
+        .withSuccessHandler(data => {
+          unloadingTripData = data;
+          initUnloadingState();
+          renderUnloadingTrip();
+          setAppStatus('Trip opened', 'success');
+        })
+        .withFailureHandler(err => setAppStatus(getErrorMessage(err), 'error'))
+        .getUnloadingTrip(currentSession.workflow.key, tripId);
+    }
+
+    function initUnloadingState() {
+      unloadingState = {};
+      (unloadingTripData.orders || []).forEach(order => {
+        unloadingState[order.orderId] = {
+          receivedPieces: [],
+        };
+      });
+    }
+
+    function renderUnloadingTrip() {
+      const panel = document.getElementById('unloading-trip-panel');
+      const meta = document.getElementById('unloading-trip-meta');
+      const trip = unloadingTripData.trip;
+
+      panel.classList.remove('hidden');
+      meta.textContent = `TripID: ${trip.tripId} | Source: ${trip.sourceBranch} | Route: ${trip.route} | Truck: ${trip.truck}`;
+
+      document.getElementById('unloading-orders-body').innerHTML = unloadingTripData.orders.map(order => {
+        const state = unloadingState[order.orderId] || { receivedPieces: [] };
+        return `
+          <tr>
+            <td>${escapeHtml(order.orderId)}</td>
+            <td class="title">${escapeHtml(order.title)}</td>
+            <td>${escapeHtml(order.expectedPieces)}</td>
+            <td>${renderUnloadingPieces(order, state)}</td>
+            <td>${renderUnloadingOrderStatus(order, state)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderUnloadingPieces(order, state) {
+      const pieces = order.expectedCountPieces && order.expectedCountPieces.length
+        ? order.expectedCountPieces
+        : Array.from({ length: order.expectedPieces }, (_, index) => index + 1);
+
+      return `<div class="pieces-grid">${pieces.map(pieceNumber => {
+        const received = state.receivedPieces.includes(pieceNumber);
+        const cls = received ? 'loaded' : '';
+        return `
+          <button class="piece-toggle ${cls}" onclick="toggleUnloadingPiece('${escapeJs(order.orderId)}', ${pieceNumber})">
+            Piece ${pieceNumber}
+          </button>
+        `;
+      }).join('')}</div>`;
+    }
+
+    function toggleUnloadingPiece(orderId, pieceNumber) {
+      const state = unloadingState[orderId];
+      if (!state) return;
+
+      const received = state.receivedPieces.includes(pieceNumber);
+
+      state.receivedPieces = state.receivedPieces.filter(item => item !== pieceNumber);
+
+      if (!received) {
+        state.receivedPieces.push(pieceNumber);
+      }
+
+      state.receivedPieces.sort((a, b) => a - b);
+      renderUnloadingTrip();
+    }
+
+    function renderUnloadingOrderStatus(order, state) {
+      if (state.receivedPieces.length >= order.expectedPieces) return '<span class="badge completed">Received</span>';
+      if (state.receivedPieces.length > 0) return '<span class="badge started">Partial</span>';
+      return '<span class="badge">Not received</span>';
+    }
+
+    function closeUnloadingTrip() {
+      if (!unloadingTripData || !unloadingTripData.trip) {
+        setAppStatus('Open TripID first.', 'error');
+        return;
+      }
+
+      const summary = getUnloadingSummary();
+      if (summary.missingPieces > 0 && !confirm(`There are ${summary.missingPieces} unreceived pieces. Close trip?`)) {
+        return;
+      }
+
+      setCloseTripDisabled(true);
+      setAppStatus('Closing trip...');
+      google.script.run
+        .withSuccessHandler(result => {
+          setCloseTripDisabled(false);
+          setAppStatus(`Trip closed: ${result.receivingId}. Orders: ${result.orders}. Missing: ${result.missing}`, result.missing ? 'warning' : 'success');
+          document.getElementById('unloading-trip-panel').classList.add('hidden');
+          unloadingTripData = null;
+          unloadingState = {};
+          loadUnloadingTrips();
+        })
+        .withFailureHandler(err => {
+          setCloseTripDisabled(false);
+          setAppStatus(getErrorMessage(err), 'error');
+        })
+        .closeUnloadingTrip(currentSession.workflow.key, {
+          tripId: unloadingTripData.trip.tripId,
+          username: currentSession.username,
+          truck: currentSession.truck,
+          orders: unloadingState,
+        });
+    }
+
+    function getUnloadingSummary() {
+      const summary = { expectedPieces: 0, receivedPieces: 0, missingPieces: 0 };
+
+      if (!unloadingTripData || !Array.isArray(unloadingTripData.orders)) return summary;
+
+      unloadingTripData.orders.forEach(order => {
+        const state = unloadingState[order.orderId] || { receivedPieces: [] };
+        summary.expectedPieces += Number(order.expectedPieces || 0);
+        summary.receivedPieces += state.receivedPieces.length;
+      });
+
+      summary.missingPieces = Math.max(0, summary.expectedPieces - summary.receivedPieces);
+      return summary;
+    }
+
+    function setCloseTripDisabled(disabled) {
+      const button = document.getElementById('close-trip-button');
+      if (button) button.disabled = disabled;
+    }
+
+    function loadLoadingData() {
+      setAppStatus('Loading orders...');
+
+      google.script.run
+        .withSuccessHandler(data => {
+          loadingData = data;
+          applyPendingToData();
+          cacheLoadingData();
+          renderStats();
+          renderOrders();
+          setAppStatus(getPendingCount() ? `Unsaved changes: ${getPendingCount()}` : 'Saved', getPendingCount() ? 'warning' : 'success');
+        })
+        .withFailureHandler(err => {
+          const restored = restoreCachedLoadingData();
+          if (restored) {
+            renderStats();
+            renderOrders();
+            setAppStatus(`Network error. Showing cached data. ${getErrorMessage(err)}`, 'warning');
+          } else {
+            setAppStatus(getErrorMessage(err), 'error');
+          }
+        })
+        .getLoadingData(currentSession.workflow.key);
+    }
+
+    function renderStats() {
+      document.getElementById('stats-body').innerHTML = loadingData.stats.map(stat => `
+        <tr class="${stat.type === 'Total' ? 'total-row' : ''}">
+          <td><strong>${escapeHtml(stat.type)}</strong></td>
+          <td>${formatNumber(stat.initialWeight)}</td>
+          <td>${formatNumber(stat.loadedWeight)}</td>
+          <td>${formatNumber(stat.remainedWeight)}</td>
+          <td>${formatNumber(stat.initialVolume)}</td>
+          <td>${formatNumber(stat.loadedVolume)}</td>
+          <td>${formatNumber(stat.remainedVolume)}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderOrders() {
+      const search = document.getElementById('search').value.trim().toLowerCase();
+      const colorFilter = document.getElementById('color-filter').value;
+      const statusFilter = document.getElementById('status-filter').value;
+      const rows = loadingData.orders.filter(order => {
+        const matchesSearch = !search ||
+          order.orderId.toLowerCase().includes(search) ||
+          String(order.title || '').toLowerCase().includes(search);
+        const matchesColor = !colorFilter || order.color === colorFilter;
+        const matchesStatus = !statusFilter || order.status === statusFilter;
+        return matchesSearch && matchesColor && matchesStatus;
+      });
+
+      document.getElementById('orders-body').innerHTML = rows.map(renderOrderRows).join('');
+
+      Object.keys(openedOrders).forEach(orderId => loadPiecesPanel(orderId));
+    }
+
+    function renderOrderRows(order) {
+      const rowClass = getRowClass(order);
+      const pending = hasPendingForOrder(order.orderId);
+      const piecesEditable = renderPiecesEditor(order);
+      const openDisabled = !order.piecesTotal ? 'disabled' : '';
+      const detailRow = openedOrders[order.orderId]
+        ? `<tr><td colspan="10"><div id="pieces-panel-${escapeAttr(order.orderId)}">Loading pieces...</div></td></tr>`
+        : '';
+
+      return `
+        <tr class="${rowClass}" id="order-row-${escapeAttr(order.orderId)}">
+          <td class="progress">${renderProgress(order)}</td>
+          <td><button class="open-pieces" ${openDisabled} onclick="togglePiecesPanel('${escapeJs(order.orderId)}')">Open</button></td>
+          <td class="id-${escapeAttr(order.color)}">${escapeHtml(order.orderId)}</td>
+          <td class="title">${escapeHtml(order.title)}</td>
+          <td>${piecesEditable}</td>
+          <td>${escapeHtml(order.zone)}</td>
+          <td>${escapeHtml(order.deliveryDate)}</td>
+          <td class="hide-mobile">${formatNumber(order.volume)}</td>
+          <td class="hide-mobile">${formatNumber(order.weight)}</td>
+          <td>${renderLoadingStatus(order, pending)}</td>
+        </tr>
+        ${detailRow}
+      `;
+    }
+
+    function renderPiecesEditor(order) {
+      const value = order.piecesInput || '';
+      return `
+        <span class="stepper">
+          <button onclick="stepPieces('${escapeJs(order.orderId)}', -1)">-</button>
+          <input value="${escapeAttr(value)}" inputmode="numeric" onchange="setPiecesInput('${escapeJs(order.orderId)}', this.value)">
+          <button onclick="stepPieces('${escapeJs(order.orderId)}', 1)">+</button>
+        </span>
+      `;
+    }
+
+    function renderProgress(order) {
+      if (order.piecesTotal) return `${order.loadedPieces} / ${order.piecesTotal}`;
+
+      return `
+        <span class="stepper">
+          <button onclick="stepUnknownLoaded('${escapeJs(order.orderId)}', -1)">-</button>
+          <strong>${order.loadedPieces} / N</strong>
+          <button onclick="stepUnknownLoaded('${escapeJs(order.orderId)}', 1)">+</button>
+        </span>
+      `;
+    }
+
+    function renderLoadingStatus(order, pending) {
+      if (pending) return '<span class="badge pending">Pending save</span>';
+      if (order.tripState && order.tripState.remaining) return '<span class="badge pending">Remaining</span>';
+      if (order.tripState && order.tripState.inTrip) return '<span class="badge trip">In trip</span>';
+      if (order.status === 'Completed') return '<span class="badge completed">Completed</span>';
+      if (order.status === 'Started') return '<span class="badge started">Started</span>';
+      if (order.status === 'Requires Pieces') return '<span class="badge req">Req.Pcs</span>';
+      return '<span class="badge">Not started</span>';
+    }
+
+    function togglePiecesPanel(orderId) {
+      if (openedOrders[orderId]) delete openedOrders[orderId];
+      else openedOrders[orderId] = true;
+      renderOrders();
+    }
+
+    function loadPiecesPanel(orderId) {
+      const panel = document.getElementById(`pieces-panel-${orderId}`);
+      if (!panel) return;
+
+      const cached = piecesCache[orderId];
+      if (cached) {
+        panel.innerHTML = renderPiecesGrid(orderId, cached.pieces);
+      }
+
+      google.script.run
+        .withSuccessHandler(data => {
+          const mergedData = applyPendingToPiecesData(orderId, data);
+          piecesCache[orderId] = mergedData;
+          panel.innerHTML = renderPiecesGrid(orderId, mergedData.pieces);
+          cachePieces();
+        })
+        .withFailureHandler(err => {
+          if (cached) {
+            panel.innerHTML = renderPiecesGrid(orderId, cached.pieces);
+            setAppStatus(`Network error. Showing cached pieces. ${getErrorMessage(err)}`, 'warning');
+          } else {
+            panel.innerHTML = `<div style="color:#b3261e;font-weight:bold;">Failed to load pieces: ${escapeHtml(getErrorMessage(err))}</div>`;
+          }
+        })
+        .getLoadingPieces(currentSession.workflow.key, orderId);
+    }
+
+    function applyPendingToPiecesData(orderId, data) {
+      const next = {
+        orderId: data.orderId,
+        piecesTotal: data.piecesTotal,
+        pieces: (data.pieces || []).map(piece => ({ ...piece })),
+      };
+
+      next.pieces.forEach(piece => {
+        const pending = pendingPieceUpdates[`${orderId}::${piece.pieceNumber}`];
+        if (pending) piece.loaded = pending.loaded === true;
+      });
+
+      return next;
+    }
+
+    function renderPiecesGrid(orderId, pieces) {
+      return `<div class="pieces-grid">${pieces.map(piece => `
+        <button class="piece-toggle ${piece.loaded ? 'loaded' : ''}"
+          onclick="togglePiece('${escapeJs(orderId)}', ${piece.pieceNumber}, ${piece.loaded ? 'false' : 'true'})">
+          Piece ${piece.pieceNumber}
+        </button>
+      `).join('')}</div>`;
+    }
+
+    function togglePiece(orderId, pieceNumber, loaded) {
+      const order = findOrder(orderId);
+      if (!order || !order.piecesTotal) return;
+
+      const numbers = new Set(order.loadedPieceNumbers || []);
+      if (loaded) numbers.add(pieceNumber);
+      else numbers.delete(pieceNumber);
+
+      order.loadedPieceNumbers = Array.from(numbers).sort((a, b) => a - b);
+      order.loadedPieces = order.loadedPieceNumbers.length;
+      order.status = getStatus(order);
+
+      if (piecesCache[orderId]) {
+        piecesCache[orderId].pieces = piecesCache[orderId].pieces.map(piece => {
+          if (Number(piece.pieceNumber) === Number(pieceNumber)) piece.loaded = loaded;
+          return piece;
+        });
+        cachePieces();
+      }
+
+      pendingPieceUpdates[`${orderId}::${pieceNumber}`] = { orderId, pieceNumber, loaded };
+      persistPendingQueue();
+      renderStatsFromOrders();
+      renderOrders();
+      setAppStatus(`Unsaved changes: ${getPendingCount()}`, 'warning');
+    }
+
+    function stepUnknownLoaded(orderId, delta) {
+      const order = findOrder(orderId);
+      if (!order || order.piecesTotal) return;
+
+      order.loadedPieces = Math.max(0, Number(order.loadedPieces || 0) + delta);
+      order.status = getStatus(order);
+      pendingUnknownUpdates[orderId] = { orderId, row: order.row, loadedPieces: order.loadedPieces };
+      persistPendingQueue();
+      renderStatsFromOrders();
+      renderOrders();
+      setAppStatus(`Unsaved changes: ${getPendingCount()}`, 'warning');
+    }
+
+    function stepPieces(orderId, delta) {
+      const order = findOrder(orderId);
+      if (!order) return;
+
+      const current = Number(order.piecesInput || 0) || 0;
+      setPiecesInput(orderId, Math.max(0, current + delta));
+    }
+
+    function setPiecesInput(orderId, value) {
+      const order = findOrder(orderId);
+      if (!order) return;
+
+      const normalized = value === '' ? '' : Math.max(0, Math.floor(Number(value) || 0));
+      order.piecesInput = normalized;
+      order.piecesTotal = normalized > 0 ? normalized : null;
+      order.status = getStatus(order);
+      pendingPiecesInputs[orderId] = { orderId, row: order.row, pieces: normalized };
+      persistPendingQueue();
+      renderOrders();
+      setAppStatus(`Unsaved changes: ${getPendingCount()}`, 'warning');
+    }
+
+    function savePendingChanges(callback) {
+      const payload = {
+        username: currentSession.username,
+        pieceUpdates: Object.values(pendingPieceUpdates),
+        unknownUpdates: Object.values(pendingUnknownUpdates),
+        piecesInputs: Object.values(pendingPiecesInputs),
+      };
+
+      if (!getPendingCount()) {
+        setAppStatus('Saved', 'success');
+        if (callback) callback(true);
+        return;
+      }
+
+      setAppStatus('Saving...');
+      setLoadingActionDisabled(true);
+
+      google.script.run
+        .withSuccessHandler(() => {
+          pendingPieceUpdates = {};
+          pendingUnknownUpdates = {};
+          pendingPiecesInputs = {};
+          persistPendingQueue();
+          setAppStatus('Saved', 'success');
+          loadLoadingData();
+          setLoadingActionDisabled(false);
+          if (callback) callback(true);
+        })
+        .withFailureHandler(err => {
+          setAppStatus(`Sync failed. ${getErrorMessage(err)}`, 'error');
+          setLoadingActionDisabled(false);
+          if (callback) callback(false);
+        })
+        .saveLoadingChanges(currentSession.workflow.key, payload);
+    }
+
+    function generateTrip() {
+      savePendingChanges(ok => {
+        if (!ok) return;
+
+        setAppStatus('Generating trip...');
+        setLoadingActionDisabled(true);
+        google.script.run
+          .withSuccessHandler(result => {
+            showTripConfirmation(result);
+            setAppStatus(`Trip generated: ${result.tripId}`, 'success');
+            openedOrders = {};
+            loadLoadingData();
+            setLoadingActionDisabled(false);
+          })
+          .withFailureHandler(err => {
+            setAppStatus(getErrorMessage(err), 'error');
+            setLoadingActionDisabled(false);
+          })
+          .generateLoadingTrip(currentSession.workflow.key, currentSession.truck, currentSession.username);
+      });
+    }
+
+    function setLoadingActionDisabled(disabled) {
+      const saveButton = document.getElementById('save-button');
+      const generateButton = document.getElementById('generate-trip-button');
+      if (saveButton) saveButton.disabled = disabled;
+      if (generateButton) generateButton.disabled = disabled;
+    }
+
+    function showTripConfirmation(result) {
+      const panel = document.getElementById('trip-confirmation');
+      panel.classList.remove('hidden');
+      panel.innerHTML = `
+        <h2>Trip created</h2>
+        <table class="context-table">
+          <tbody>
+            <tr><th>TripID</th><td><strong>${escapeHtml(result.tripId)}</strong></td></tr>
+            <tr><th>Generated</th><td>${escapeHtml(result.generatedAt || '')}</td></tr>
+            <tr><th>Branch</th><td>${escapeHtml(result.branch || '')}</td></tr>
+            <tr><th>Route</th><td>${escapeHtml(result.route || '')}</td></tr>
+            <tr><th>Truck</th><td><strong>${escapeHtml(result.truck || '')}</strong></td></tr>
+            <tr><th>User</th><td>${escapeHtml(result.user || '')}</td></tr>
+            <tr><th>Orders</th><td>${escapeHtml(result.rows || 0)}</td></tr>
+          </tbody>
+        </table>
+      `;
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function changeWorkflow() {
+      document.getElementById('dashboard-panel').classList.add('hidden');
+      document.getElementById('auth-shell').classList.remove('hidden');
+      if (currentUser) renderWorkflowSelector(currentUser.workflows);
+      showAuthPanel(currentUser ? 'selector-panel' : 'login-panel');
+    }
+
+    function logout() {
+      currentUser = null;
+      currentSession = null;
+      localStorage.removeItem(SESSION_KEY);
+      document.getElementById('password').value = '';
+      document.getElementById('dashboard-panel').classList.add('hidden');
+      document.getElementById('auth-shell').classList.remove('hidden');
+      showAuthPanel('login-panel');
+      showStatus('Logged out.', 'success');
+    }
+
+    function restoreSession() {
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (!raw) {
+        showAuthPanel('login-panel');
+        return;
+      }
+
+      try {
+        currentSession = JSON.parse(raw);
+        if (!currentSession || !currentSession.username || !currentSession.workflow || !currentSession.truck) throw new Error('Bad session');
+        currentUser = { username: currentSession.username, workflows: [currentSession.workflow] };
+        renderDashboard();
+      } catch (error) {
+        localStorage.removeItem(SESSION_KEY);
+        showAuthPanel('login-panel');
+      }
+    }
+
+    function getSelectedWorkflow() {
+      const selectedKey = document.getElementById('workflow').value;
+      return currentUser.workflows.find(workflow => workflow.key === selectedKey) || currentUser.workflows[0];
+    }
+
+    function getRowClass(order) {
+      if (order.status === 'Completed') return 'completed-row';
+      if (order.status === 'Started') return 'started-row';
+      return '';
+    }
+
+    function getStatus(order) {
+      if (order.loadedPieces <= 0) return order.piecesTotal ? 'Not Started' : 'Requires Pieces';
+      if (order.piecesTotal && order.loadedPieces >= order.piecesTotal) return 'Completed';
+      return 'Started';
+    }
+
+    function findOrder(orderId) {
+      return loadingData.orders.find(order => order.orderId === String(orderId));
+    }
+
+    function renderStatsFromOrders() {
+      const statsMap = {
+        red: createStat('red'),
+        yellow: createStat('yellow'),
+        green: createStat('green'),
+        Total: createStat('Total'),
+      };
+
+      loadingData.orders.forEach(order => {
+        updateStat(statsMap[order.color], order);
+        updateStat(statsMap.Total, order);
+      });
+
+      loadingData.stats = [statsMap.red, statsMap.yellow, statsMap.green, statsMap.Total].map(finalizeStat);
+      renderStats();
+    }
+
+    function createStat(type) {
+      return { type, initialWeight: 0, loadedWeight: 0, remainedWeight: 0, initialVolume: 0, loadedVolume: 0, remainedVolume: 0 };
+    }
+
+    function updateStat(stat, order) {
+      if (!stat) return;
+      stat.initialWeight += Number(order.weight || 0);
+      stat.initialVolume += Number(order.volume || 0);
+      if (order.loadedPieces > 0) {
+        stat.loadedWeight += Number(order.weight || 0);
+        stat.loadedVolume += Number(order.volume || 0);
+      }
+    }
+
+    function finalizeStat(stat) {
+      stat.initialWeight = round1(stat.initialWeight);
+      stat.loadedWeight = round1(stat.loadedWeight);
+      stat.remainedWeight = round1(stat.initialWeight - stat.loadedWeight);
+      stat.initialVolume = round1(stat.initialVolume);
+      stat.loadedVolume = round1(stat.loadedVolume);
+      stat.remainedVolume = round1(stat.initialVolume - stat.loadedVolume);
+      return stat;
+    }
+
+    function applyPendingToData() {
+      Object.values(pendingUnknownUpdates).forEach(update => {
+        const order = findOrder(update.orderId);
+        if (order && !order.piecesTotal) {
+          order.loadedPieces = update.loadedPieces;
+          order.status = getStatus(order);
+        }
+      });
+
+      Object.values(pendingPiecesInputs).forEach(update => {
+        const order = findOrder(update.orderId);
+        if (order) {
+          order.piecesInput = update.pieces;
+          order.piecesTotal = update.pieces > 0 ? update.pieces : null;
+          order.status = getStatus(order);
+        }
+      });
+
+      Object.values(pendingPieceUpdates).forEach(update => {
+        const order = findOrder(update.orderId);
+        if (!order) return;
+        const numbers = new Set(order.loadedPieceNumbers || []);
+        if (update.loaded) numbers.add(update.pieceNumber);
+        else numbers.delete(update.pieceNumber);
+        order.loadedPieceNumbers = Array.from(numbers).sort((a, b) => a - b);
+        order.loadedPieces = order.loadedPieceNumbers.length;
+        order.status = getStatus(order);
+      });
+    }
+
+    function getQueueKey() {
+      return `${currentSession.workflow.storageNamespace}:${currentSession.username}:pending`;
+    }
+
+    function getCacheKey() {
+      return `${currentSession.workflow.storageNamespace}:${currentSession.username}:orders-cache`;
+    }
+
+    function getPiecesCacheKey() {
+      return `${currentSession.workflow.storageNamespace}:${currentSession.username}:pieces-cache`;
+    }
+
+    function restorePendingQueue() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(getQueueKey()) || '{}');
+        pendingPieceUpdates = saved.pendingPieceUpdates || {};
+        pendingUnknownUpdates = saved.pendingUnknownUpdates || {};
+        pendingPiecesInputs = saved.pendingPiecesInputs || {};
+      } catch (error) {
+        pendingPieceUpdates = {};
+        pendingUnknownUpdates = {};
+        pendingPiecesInputs = {};
+      }
+
+      try {
+        piecesCache = JSON.parse(localStorage.getItem(getPiecesCacheKey()) || '{}');
+      } catch (error) {
+        piecesCache = {};
+      }
+    }
+
+    function persistPendingQueue() {
+      localStorage.setItem(getQueueKey(), JSON.stringify({ pendingPieceUpdates, pendingUnknownUpdates, pendingPiecesInputs }));
+    }
+
+    function cacheLoadingData() {
+      localStorage.setItem(getCacheKey(), JSON.stringify({ cachedAt: new Date().toISOString(), data: loadingData }));
+    }
+
+    function restoreCachedLoadingData() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(getCacheKey()) || 'null');
+        if (!saved || !saved.data) return false;
+        loadingData = saved.data;
+        applyPendingToData();
+        return true;
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function cachePieces() {
+      localStorage.setItem(getPiecesCacheKey(), JSON.stringify(piecesCache));
+    }
+
+    function hasPendingForOrder(orderId) {
+      return Boolean(pendingUnknownUpdates[orderId] || pendingPiecesInputs[orderId] ||
+        Object.keys(pendingPieceUpdates).some(key => key.indexOf(`${orderId}::`) === 0));
+    }
+
+    function getPendingCount() {
+      return Object.keys(pendingPieceUpdates).length + Object.keys(pendingUnknownUpdates).length + Object.keys(pendingPiecesInputs).length;
+    }
+
+    function showAuthPanel(panelId) {
+      ['login-panel', 'selector-panel'].forEach(id => document.getElementById(id).classList.toggle('hidden', id !== panelId));
+    }
+
+    function showStatus(message, type) {
+      const status = document.getElementById('status');
+      status.textContent = message;
+      status.className = `status ${type || ''}`;
+    }
+
+    function hideStatus() {
+      const status = document.getElementById('status');
+      status.className = 'status hidden';
+      status.textContent = '';
+    }
+
+    function setAppStatus(message, type) {
+      const status = document.getElementById('app-status');
+      status.textContent = message;
+      status.className = `status ${type || ''}`;
+    }
+
+    function setLoginDisabled(disabled) {
+      document.getElementById('login-button').disabled = disabled;
+    }
+
+    function titleCase(value) {
+      const text = String(value || '');
+      return text.charAt(0).toUpperCase() + text.slice(1);
+    }
+
+    function formatNumber(value) {
+      const number = Number(value || 0);
+      return Number.isInteger(number) ? String(number) : String(Math.round(number * 10) / 10);
+    }
+
+    function round1(value) {
+      return Math.round((Number(value) || 0) * 10) / 10;
+    }
+
+    function getErrorMessage(err) {
+      return err && err.message ? err.message : String(err || 'Unknown error');
+    }
+
+    function escapeHtml(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value);
+    }
+
+    function escapeJs(value) {
+      return String(value == null ? '' : value).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    }
+  </script>
+</body>
+</html>
