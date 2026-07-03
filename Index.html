@@ -367,6 +367,8 @@
 
   <script>
     const SESSION_KEY = 'warehouse-control:v1:session';
+    const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
+    const BACKEND_TIMEOUT_MS = 12000;
 
     let initialData = null;
     let currentUser = null;
@@ -454,7 +456,9 @@
         savedAt: new Date().toISOString(),
       };
 
-      localStorage.setItem(SESSION_KEY, JSON.stringify(currentSession));
+      if (!safeSetLocalStorage(SESSION_KEY, JSON.stringify(currentSession))) {
+        showStatus('Local session storage failed. You can continue, but may need to login again after reload.', 'warning');
+      }
       renderDashboard();
     }
 
@@ -663,10 +667,23 @@
 
     function loadLoadingData() {
       setAppStatus('Loading orders...');
+      const timeoutId = setTimeout(() => {
+        const restored = restoreCachedLoadingData();
+        if (restored) {
+          renderStats();
+          renderOrders();
+          setAppStatus('Backend timeout. Showing cached data. Retry when connection is back.', 'warning');
+        } else {
+          setAppStatus('Backend timeout. No cached orders found on this phone.', 'error');
+        }
+      }, BACKEND_TIMEOUT_MS);
 
       google.script.run
         .withSuccessHandler(data => {
+          clearTimeout(timeoutId);
           loadingData = data;
+          piecesCache = {};
+          safeRemoveLocalStorage(getPiecesCacheKey());
           applyPendingToData();
           cacheLoadingData();
           renderStats();
@@ -674,6 +691,7 @@
           setAppStatus(getPendingCount() ? `Unsaved changes: ${getPendingCount()}` : 'Saved', getPendingCount() ? 'warning' : 'success');
         })
         .withFailureHandler(err => {
+          clearTimeout(timeoutId);
           const restored = restoreCachedLoadingData();
           if (restored) {
             renderStats();
@@ -790,20 +808,36 @@
       const cached = piecesCache[orderId];
       if (cached) {
         panel.innerHTML = renderPiecesGrid(orderId, cached.pieces);
-      } else if (renderCachedPiecesPanel(panel, orderId)) {
+        return;
+      }
+
+      if (renderCachedPiecesPanel(panel, orderId)) {
         setAppStatus(getPendingCount() ? `Unsaved changes: ${getPendingCount()}` : 'Showing cached pieces. Save when connection is back.', 'warning');
       }
 
+      const timeoutId = setTimeout(() => {
+        const fallback = piecesCache[orderId];
+        if (fallback) {
+          panel.innerHTML = renderPiecesGrid(orderId, fallback.pieces);
+          setAppStatus('Backend timeout. Showing cached pieces. Save when connection is back.', 'warning');
+        } else {
+          panel.innerHTML = `<div style="color:#b3261e;font-weight:bold;">Failed to load pieces: backend timeout</div>`;
+        }
+      }, BACKEND_TIMEOUT_MS);
+
       google.script.run
         .withSuccessHandler(data => {
+          clearTimeout(timeoutId);
           const mergedData = applyPendingToPiecesData(orderId, data);
           piecesCache[orderId] = mergedData;
           panel.innerHTML = renderPiecesGrid(orderId, mergedData.pieces);
           cachePieces();
         })
         .withFailureHandler(err => {
-          if (cached) {
-            panel.innerHTML = renderPiecesGrid(orderId, cached.pieces);
+          clearTimeout(timeoutId);
+          const fallback = piecesCache[orderId];
+          if (fallback) {
+            panel.innerHTML = renderPiecesGrid(orderId, fallback.pieces);
             setAppStatus(`Network error. Showing cached pieces. ${getErrorMessage(err)}`, 'warning');
           } else {
             panel.innerHTML = `<div style="color:#b3261e;font-weight:bold;">Failed to load pieces: ${escapeHtml(getErrorMessage(err))}</div>`;
@@ -949,28 +983,42 @@
 
       if (!getPendingCount()) {
         setAppStatus('Saved', 'success');
+        setSaveButtonLabel('Save');
         if (callback) callback(true);
         return;
       }
 
       setAppStatus('Saving...');
+      setSaveButtonLabel('Saving...');
       setLoadingActionDisabled(true);
+      let saveTimedOut = false;
+      const timeoutId = setTimeout(() => {
+        saveTimedOut = true;
+        setAppStatus('Save failed. Changes are still stored on this phone. Retry when connection is back.', 'error');
+        setSaveButtonLabel('Retry Save');
+        setLoadingActionDisabled(false);
+        if (callback) callback(false);
+      }, BACKEND_TIMEOUT_MS);
 
       google.script.run
         .withSuccessHandler(() => {
+          clearTimeout(timeoutId);
           pendingPieceUpdates = {};
           pendingUnknownUpdates = {};
           pendingPiecesInputs = {};
           persistPendingQueue();
           setAppStatus('Saved', 'success');
+          setSaveButtonLabel('Save');
           loadLoadingData();
           setLoadingActionDisabled(false);
-          if (callback) callback(true);
+          if (callback && !saveTimedOut) callback(true);
         })
         .withFailureHandler(err => {
-          setAppStatus(`Sync failed. ${getErrorMessage(err)}`, 'error');
+          clearTimeout(timeoutId);
+          setAppStatus('Save failed. Changes are still stored on this phone. Retry when connection is back.', 'error');
+          setSaveButtonLabel('Retry Save');
           setLoadingActionDisabled(false);
-          if (callback) callback(false);
+          if (callback && !saveTimedOut) callback(false);
         })
         .saveLoadingChanges(currentSession.workflow.key, payload);
     }
@@ -981,8 +1029,14 @@
 
         setAppStatus('Generating trip...');
         setLoadingActionDisabled(true);
+        const timeoutId = setTimeout(() => {
+          setAppStatus('Generate Trip timeout. If connection is unstable, refresh reports before trying again.', 'warning');
+          setLoadingActionDisabled(false);
+        }, BACKEND_TIMEOUT_MS);
+
         google.script.run
           .withSuccessHandler(result => {
+            clearTimeout(timeoutId);
             showTripConfirmation(result);
             setAppStatus(`Trip generated: ${result.tripId}`, 'success');
             openedOrders = {};
@@ -990,6 +1044,7 @@
             setLoadingActionDisabled(false);
           })
           .withFailureHandler(err => {
+            clearTimeout(timeoutId);
             setAppStatus(getErrorMessage(err), 'error');
             setLoadingActionDisabled(false);
           })
@@ -1002,6 +1057,11 @@
       const generateButton = document.getElementById('generate-trip-button');
       if (saveButton) saveButton.disabled = disabled;
       if (generateButton) generateButton.disabled = disabled;
+    }
+
+    function setSaveButtonLabel(label) {
+      const saveButton = document.getElementById('save-button');
+      if (saveButton) saveButton.textContent = label;
     }
 
     function showTripConfirmation(result) {
@@ -1025,6 +1085,10 @@
     }
 
     function changeWorkflow() {
+      if (hasUnsavedLoadingChanges() && !confirm('There are unsaved loading changes on this phone. Change workflow anyway?')) {
+        return;
+      }
+
       document.getElementById('dashboard-panel').classList.add('hidden');
       document.getElementById('auth-shell').classList.remove('hidden');
       if (currentUser) renderWorkflowSelector(currentUser.workflows);
@@ -1032,9 +1096,13 @@
     }
 
     function logout() {
+      if (hasUnsavedLoadingChanges() && !confirm('There are unsaved loading changes on this phone. Logout anyway?')) {
+        return;
+      }
+
       currentUser = null;
       currentSession = null;
-      localStorage.removeItem(SESSION_KEY);
+      safeRemoveLocalStorage(SESSION_KEY);
       document.getElementById('password').value = '';
       document.getElementById('dashboard-panel').classList.add('hidden');
       document.getElementById('auth-shell').classList.remove('hidden');
@@ -1043,7 +1111,7 @@
     }
 
     function restoreSession() {
-      const raw = localStorage.getItem(SESSION_KEY);
+      const raw = safeGetLocalStorage(SESSION_KEY);
       if (!raw) {
         showAuthPanel('login-panel');
         return;
@@ -1052,10 +1120,12 @@
       try {
         currentSession = JSON.parse(raw);
         if (!currentSession || !currentSession.username || !currentSession.workflow || !currentSession.truck) throw new Error('Bad session');
+        const savedAt = Date.parse(currentSession.savedAt || '');
+        if (!savedAt || Date.now() - savedAt > SESSION_TTL_MS) throw new Error('Session expired');
         currentUser = { username: currentSession.username, workflows: [currentSession.workflow] };
         renderDashboard();
       } catch (error) {
-        localStorage.removeItem(SESSION_KEY);
+        safeRemoveLocalStorage(SESSION_KEY);
         showAuthPanel('login-panel');
       }
     }
@@ -1166,7 +1236,7 @@
 
     function restorePendingQueue() {
       try {
-        const saved = JSON.parse(localStorage.getItem(getQueueKey()) || '{}');
+        const saved = JSON.parse(safeGetLocalStorage(getQueueKey()) || '{}');
         pendingPieceUpdates = saved.pendingPieceUpdates || {};
         pendingUnknownUpdates = saved.pendingUnknownUpdates || {};
         pendingPiecesInputs = saved.pendingPiecesInputs || {};
@@ -1177,23 +1247,29 @@
       }
 
       try {
-        piecesCache = JSON.parse(localStorage.getItem(getPiecesCacheKey()) || '{}');
+        piecesCache = JSON.parse(safeGetLocalStorage(getPiecesCacheKey()) || '{}');
       } catch (error) {
         piecesCache = {};
       }
     }
 
     function persistPendingQueue() {
-      localStorage.setItem(getQueueKey(), JSON.stringify({ pendingPieceUpdates, pendingUnknownUpdates, pendingPiecesInputs }));
+      const saved = safeSetLocalStorage(getQueueKey(), JSON.stringify({ pendingPieceUpdates, pendingUnknownUpdates, pendingPiecesInputs }));
+      if (!saved) {
+        setAppStatus('Local save failed. Keep this page open and retry when possible.', 'error');
+      }
     }
 
     function cacheLoadingData() {
-      localStorage.setItem(getCacheKey(), JSON.stringify({ cachedAt: new Date().toISOString(), data: loadingData }));
+      const saved = safeSetLocalStorage(getCacheKey(), JSON.stringify({ cachedAt: new Date().toISOString(), data: loadingData }));
+      if (!saved) {
+        setAppStatus('Local orders cache failed. Keep this page open if connection is unstable.', 'warning');
+      }
     }
 
     function restoreCachedLoadingData() {
       try {
-        const saved = JSON.parse(localStorage.getItem(getCacheKey()) || 'null');
+        const saved = JSON.parse(safeGetLocalStorage(getCacheKey()) || 'null');
         if (!saved || !saved.data) return false;
         loadingData = saved.data;
         applyPendingToData();
@@ -1204,10 +1280,36 @@
     }
 
     function cachePieces() {
-      try {
-        localStorage.setItem(getPiecesCacheKey(), JSON.stringify(piecesCache));
-      } catch (error) {
+      const saved = safeSetLocalStorage(getPiecesCacheKey(), JSON.stringify(piecesCache));
+      if (!saved) {
         setAppStatus('Local pieces cache failed. Keep this page open and retry save.', 'warning');
+      }
+    }
+
+    function safeGetLocalStorage(key) {
+      try {
+        return localStorage.getItem(key);
+      } catch (error) {
+        setAppStatus('Local phone storage is unavailable.', 'warning');
+        return null;
+      }
+    }
+
+    function safeSetLocalStorage(key, value) {
+      try {
+        localStorage.setItem(key, value);
+        return true;
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function safeRemoveLocalStorage(key) {
+      try {
+        localStorage.removeItem(key);
+        return true;
+      } catch (error) {
+        return false;
       }
     }
 
@@ -1218,6 +1320,10 @@
 
     function getPendingCount() {
       return Object.keys(pendingPieceUpdates).length + Object.keys(pendingUnknownUpdates).length + Object.keys(pendingPiecesInputs).length;
+    }
+
+    function hasUnsavedLoadingChanges() {
+      return Boolean(currentSession && currentSession.workflow && currentSession.workflow.mode === 'loading' && getPendingCount() > 0);
     }
 
     function showAuthPanel(panelId) {

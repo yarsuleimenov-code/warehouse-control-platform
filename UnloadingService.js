@@ -139,6 +139,7 @@ function closeUnloadingTrip(contextKey, payload) {
   ensureUnloadingSupportSheets_(config);
 
   payload = payload || {};
+  assertUserAccess_(payload.username || '', contextKey);
 
   if (!payload.tripId) {
     throw new Error('TripID is required.');

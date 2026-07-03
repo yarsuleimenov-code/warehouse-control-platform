@@ -116,3 +116,35 @@ function getAllowedConfigs_(access) {
       };
     });
 }
+
+function assertUserAccess_(username, contextKey) {
+  var normalizedUsername = String(username || '').trim();
+  var normalizedContextKey = String(contextKey || '').trim();
+
+  if (!normalizedUsername) {
+    throw new Error('User is required.');
+  }
+
+  if (!normalizedContextKey) {
+    throw new Error('Workflow is required.');
+  }
+
+  var user = findUser_(normalizedUsername);
+  if (!user) {
+    throw new Error('User not found.');
+  }
+
+  if (!user.active) {
+    throw new Error('User is inactive.');
+  }
+
+  var allowed = user.access.some(function(item) {
+    return item === normalizedContextKey;
+  });
+
+  if (!allowed) {
+    throw new Error('User does not have access to this workflow.');
+  }
+
+  return user;
+}

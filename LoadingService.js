@@ -118,6 +118,7 @@ function saveLoadingChanges(contextKey, payload) {
   ensureLoadingSupportSheets_(config);
 
   payload = payload || {};
+  assertUserAccess_(payload.username || '', contextKey);
 
   savePiecesTotalUpdates_(config, payload.piecesInputs || []);
   saveUnknownLoadedUpdates_(config, payload.unknownUpdates || []);
@@ -131,6 +132,8 @@ function saveLoadingChanges(contextKey, payload) {
 
 function generateLoadingTrip(contextKey, truck, username) {
   var config = getLoadingConfig_(contextKey);
+  assertUserAccess_(username || '', contextKey);
+
   if (!truck) {
     throw new Error('Truck is required.');
   }
@@ -290,9 +293,10 @@ function buildOrder_(row, rowNumber, headerMap, piecesMap, tripStateMap) {
 function findOrderById_(config, orderId) {
   var sheet = getRequiredSheet_(config.sheets.orders);
   var read = readOrders_(sheet);
+  var piecesMap = getOrderPiecesMap_(config);
 
   for (var i = 0; i < read.rows.length; i++) {
-    var order = buildOrder_(read.rows[i], i + 2, read.headerMap, getOrderPiecesMap_(config), {});
+    var order = buildOrder_(read.rows[i], i + 2, read.headerMap, piecesMap, {});
     if (order && order.orderId === String(orderId)) {
       return order;
     }
@@ -425,9 +429,23 @@ function saveLoadedPieceUpdates_(config, updates, username) {
   updates.forEach(function(update) {
     var key = config.branch + '::' + String(update.orderId) + '::' + Number(update.pieceNumber);
     var index = rowByKey[key];
-    if (index === undefined) return;
-
     var loaded = update.loaded === true;
+
+    if (index === undefined) {
+      values.push([
+        config.branch,
+        String(update.orderId),
+        Number(update.pieceNumber),
+        loaded,
+        loaded ? formatDateTime_(new Date()) : '',
+        formatDateTime_(new Date()),
+        username || '',
+        '',
+      ]);
+      rowByKey[key] = values.length - 1;
+      return;
+    }
+
     values[index][3] = loaded;
     values[index][4] = loaded ? values[index][4] || formatDateTime_(new Date()) : '';
     values[index][5] = formatDateTime_(new Date());
