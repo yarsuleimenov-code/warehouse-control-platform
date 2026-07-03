@@ -790,6 +790,8 @@
       const cached = piecesCache[orderId];
       if (cached) {
         panel.innerHTML = renderPiecesGrid(orderId, cached.pieces);
+      } else if (renderCachedPiecesPanel(panel, orderId)) {
+        setAppStatus(getPendingCount() ? `Unsaved changes: ${getPendingCount()}` : 'Showing cached pieces. Save when connection is back.', 'warning');
       }
 
       google.script.run
@@ -808,6 +810,47 @@
           }
         })
         .getLoadingPieces(currentSession.workflow.key, orderId);
+    }
+
+    function renderCachedPiecesPanel(panel, orderId) {
+      const cachedData = buildCachedPiecesData(orderId);
+      if (!cachedData) return false;
+
+      piecesCache[orderId] = cachedData;
+      panel.innerHTML = renderPiecesGrid(orderId, cachedData.pieces);
+      cachePieces();
+      return true;
+    }
+
+    function buildCachedPiecesData(orderId) {
+      const order = findOrder(orderId);
+      const piecesTotal = Number(order && order.piecesTotal);
+      if (!order || !piecesTotal) return null;
+
+      const loadedNumbers = {};
+      (order.loadedPieceNumbers || []).forEach(pieceNumber => {
+        loadedNumbers[Number(pieceNumber)] = true;
+      });
+
+      Object.values(pendingPieceUpdates).forEach(update => {
+        if (String(update.orderId) !== String(orderId)) return;
+        loadedNumbers[Number(update.pieceNumber)] = update.loaded === true;
+      });
+
+      const pieces = [];
+      for (let pieceNumber = 1; pieceNumber <= piecesTotal; pieceNumber++) {
+        pieces.push({
+          orderId: String(orderId),
+          pieceNumber,
+          loaded: loadedNumbers[pieceNumber] === true,
+        });
+      }
+
+      return {
+        orderId: String(orderId),
+        piecesTotal,
+        pieces,
+      };
     }
 
     function applyPendingToPiecesData(orderId, data) {
@@ -1161,7 +1204,11 @@
     }
 
     function cachePieces() {
-      localStorage.setItem(getPiecesCacheKey(), JSON.stringify(piecesCache));
+      try {
+        localStorage.setItem(getPiecesCacheKey(), JSON.stringify(piecesCache));
+      } catch (error) {
+        setAppStatus('Local pieces cache failed. Keep this page open and retry save.', 'warning');
+      }
     }
 
     function hasPendingForOrder(orderId) {
