@@ -275,6 +275,7 @@
           <option value="Started">Started</option>
           <option value="Completed">Completed</option>
         </select>
+        <input id="unloading-search" class="grow unloading-filter hidden" placeholder="Search unloaded orders" oninput="renderUnloadingTrip()">
         <button class="loading-only" onclick="loadLoadingData()">Refresh</button>
         <button id="save-button" class="save loading-only" onclick="savePendingChanges()">Save</button>
         <button id="generate-trip-button" class="primary loading-only" onclick="generateTrip()">Generate Trip</button>
@@ -494,6 +495,9 @@
       document.querySelectorAll('.loading-filter').forEach(item => {
         item.classList.toggle('hidden', !visible);
       });
+      document.querySelectorAll('.unloading-filter').forEach(item => {
+        item.classList.toggle('hidden', visible);
+      });
     }
 
     function loadUnloadingTrips() {
@@ -552,14 +556,18 @@
     }
 
     function renderUnloadingTrip() {
+      if (!unloadingTripData || !unloadingTripData.trip) return;
+
       const panel = document.getElementById('unloading-trip-panel');
       const meta = document.getElementById('unloading-trip-meta');
       const trip = unloadingTripData.trip;
+      const search = getUnloadingSearchTerm();
+      const rows = (unloadingTripData.orders || []).filter(order => matchesUnloadingSearch(order, search));
 
       panel.classList.remove('hidden');
       meta.textContent = `TripID: ${trip.tripId} | Source: ${trip.sourceBranch} | Route: ${trip.route} | Truck: ${trip.truck}`;
 
-      document.getElementById('unloading-orders-body').innerHTML = unloadingTripData.orders.map(order => {
+      document.getElementById('unloading-orders-body').innerHTML = rows.length ? rows.map(order => {
         const state = unloadingState[order.orderId] || { receivedPieces: [] };
         return `
           <tr>
@@ -570,7 +578,24 @@
             <td>${renderUnloadingOrderStatus(order, state)}</td>
           </tr>
         `;
-      }).join('');
+      }).join('') : '<tr><td colspan="5">No orders found</td></tr>';
+    }
+
+    function getUnloadingSearchTerm() {
+      const input = document.getElementById('unloading-search');
+      return input ? input.value.trim().toLowerCase() : '';
+    }
+
+    function matchesUnloadingSearch(order, search) {
+      if (!search) return true;
+
+      const pieces = order.expectedCountPieces && order.expectedCountPieces.length
+        ? order.expectedCountPieces
+        : Array.from({ length: order.expectedPieces }, (_, index) => index + 1);
+
+      return String(order.orderId || '').toLowerCase().includes(search) ||
+        String(order.title || '').toLowerCase().includes(search) ||
+        pieces.some(pieceNumber => String(pieceNumber).includes(search));
     }
 
     function renderUnloadingPieces(order, state) {
