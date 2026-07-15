@@ -56,6 +56,11 @@ const COLOR_MAP = {
   green: 'green',
 };
 
+const BRANCH_COLORS = {
+  NY: '#d9ead3',
+  CA: '#cfe2f3',
+};
+
 function getLoadingData(contextKey) {
   var config = getLoadingConfig_(contextKey);
   ensureLoadingSupportSheets_(config);
@@ -613,9 +618,7 @@ function applyBranchColors_(sheet, startRow, branchIndex, rows) {
     return String(row[branchIndex - 1] || '').trim().toUpperCase();
   });
   var backgrounds = branchValues.map(function(branch) {
-    if (branch === 'NY') return ['#d9ead3'];
-    if (branch === 'CA') return ['#d9eaf7'];
-    return ['#ffffff'];
+    return [BRANCH_COLORS[branch] || '#ffffff'];
   });
 
   sheet.getRange(startRow, branchIndex, rows.length, 1).setBackgrounds(backgrounds);
@@ -630,12 +633,20 @@ function applyExistingBranchColors_(sheet, headers) {
   var values = sheet.getRange(2, branchIndex, lastRow - 1, 1).getValues();
   var backgrounds = values.map(function(row) {
     var branch = String(row[0] || '').trim().toUpperCase();
-    if (branch === 'NY') return ['#d9ead3'];
-    if (branch === 'CA') return ['#d9eaf7'];
-    return ['#ffffff'];
+    return [BRANCH_COLORS[branch] || '#ffffff'];
   });
 
   sheet.getRange(2, branchIndex, backgrounds.length, 1).setBackgrounds(backgrounds);
+}
+
+function repaintTripReportsBranchColors() {
+  var sheet = ensureTripReportsSheet_(APP_CONFIGS.NY_LOADING.sheets.tripReports);
+  applyExistingBranchColors_(sheet, TRIP_REPORT_HEADERS);
+
+  return {
+    ok: true,
+    sheet: APP_CONFIGS.NY_LOADING.sheets.tripReports,
+  };
 }
 
 function getTextColumnIndexes_(headers) {
