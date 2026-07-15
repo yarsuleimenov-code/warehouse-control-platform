@@ -58,18 +58,23 @@ function getUnloadingTrips(contextKey) {
     var departureWarehouse = String(row[18] || '');
     var destinationWarehouse = String(row[19] || '');
 
-    if (!tripId || !isTripForUnloadingConfig_(config, route, departureWarehouse, destinationWarehouse)) return;
+    if (
+      !tripId ||
+      departureWarehouse !== String(config.departureWarehouse || '') ||
+      destinationWarehouse !== String(config.destinationWarehouse || '')
+    ) {
+      return;
+    }
     if (closedTrips[tripId]) return;
 
     if (!map[tripId]) {
       map[tripId] = {
         tripId: tripId,
         generatedAt: formatDateTime_(row[1]),
-        sourceBranch: row[2] || '',
         route: route,
-        departureWarehouse: departureWarehouse || getDepartureFromRoute_(route),
-        destinationWarehouse: destinationWarehouse || getDestinationFromRoute_(route),
-        truck: normalizeTruckName_(row[5]),
+        departureWarehouse: departureWarehouse,
+        destinationWarehouse: destinationWarehouse,
+        truck: row[5] || '',
         orders: 0,
         expectedPieces: 0,
       };
@@ -112,17 +117,21 @@ function getUnloadingTrip(contextKey, tripId) {
     var route = String(row[3] || '');
     var departureWarehouse = String(row[18] || '');
     var destinationWarehouse = String(row[19] || '');
-    if (!isTripForUnloadingConfig_(config, route, departureWarehouse, destinationWarehouse)) return;
+    if (
+      departureWarehouse !== String(config.departureWarehouse || '') ||
+      destinationWarehouse !== String(config.destinationWarehouse || '')
+    ) {
+      return;
+    }
 
     if (!meta) {
       meta = {
         tripId: String(row[0]),
         generatedAt: formatDateTime_(row[1]),
-        sourceBranch: row[2] || '',
         route: route,
-        departureWarehouse: departureWarehouse || getDepartureFromRoute_(route),
-        destinationWarehouse: destinationWarehouse || getDestinationFromRoute_(route),
-        truck: normalizeTruckName_(row[5]),
+        departureWarehouse: departureWarehouse,
+        destinationWarehouse: destinationWarehouse,
+        truck: row[5] || '',
       };
     }
 
@@ -169,91 +178,91 @@ function closeUnloadingTrip(contextKey, payload) {
       throw new Error('Trip is already closed: ' + payload.tripId);
     }
 
-  var details = getUnloadingTrip(contextKey, payload.tripId);
-  var orderState = payload.orders || {};
-  var now = new Date();
-  var receivedAt = formatDateTime_(now);
-  var receivingId = config.tripPrefix + '-' + Utilities.formatDate(now, APP_TIMEZONE, 'yyMMdd-HHmm');
-  var receivingRows = [];
-  var missingRows = [];
+    var details = getUnloadingTrip(contextKey, payload.tripId);
+    var orderState = payload.orders || {};
+    var now = new Date();
+    var receivedAt = formatDateTime_(now);
+    var receivingId = config.tripPrefix + '-' + Utilities.formatDate(now, APP_TIMEZONE, 'yyMMdd-HHmm');
+    var receivingRows = [];
+    var missingRows = [];
 
-  details.orders.forEach(function(order) {
-    var state = orderState[order.orderId] || {};
-    var receivedPieces = normalizePieceNumbers_(state.receivedPieces);
-    var expectedCountPieces = order.expectedCountPieces && order.expectedCountPieces.length
-      ? order.expectedCountPieces
-      : buildPieceRange_(order.expectedPieces);
-    var receivedMap = {};
+    details.orders.forEach(function(order) {
+      var state = orderState[order.orderId] || {};
+      var receivedPieces = normalizePieceNumbers_(state.receivedPieces);
+      var expectedCountPieces = order.expectedCountPieces && order.expectedCountPieces.length
+        ? order.expectedCountPieces
+        : buildPieceRange_(order.expectedPieces);
+      var receivedMap = {};
 
-    receivedPieces.forEach(function(pieceNumber) {
-      receivedMap[pieceNumber] = true;
-    });
+      receivedPieces.forEach(function(pieceNumber) {
+        receivedMap[pieceNumber] = true;
+      });
 
-    var missingPieces = expectedCountPieces.filter(function(pieceNumber) {
-      return !receivedMap[pieceNumber];
-    });
-    var expectedPieces = order.expectedPieces;
-    var status = missingPieces.length > 0
-      ? 'Missing'
-      : receivedPieces.length >= expectedPieces
-        ? 'Received'
-        : 'Partially received';
+      var missingPieces = expectedCountPieces.filter(function(pieceNumber) {
+        return !receivedMap[pieceNumber];
+      });
+      var expectedPieces = order.expectedPieces;
+      var status = missingPieces.length > 0
+        ? 'Missing'
+        : receivedPieces.length >= expectedPieces
+          ? 'Received'
+          : 'Partially received';
 
-    receivingRows.push([
-      receivingId,
-      receivedAt,
-      config.branch,
-      config.mode,
-      config.route,
-      payload.username || '',
-      normalizeTruckName_(payload.truck || details.trip.truck || ''),
-      payload.tripId,
-      order.orderId,
-      order.title,
-      expectedPieces,
-      receivedPieces.length,
-      missingPieces.length,
-      receivedPieces.join(','),
-      missingPieces.join(','),
-      status,
-      receivedAt,
-      details.trip.departureWarehouse || config.departureWarehouse || '',
-      details.trip.destinationWarehouse || config.destinationWarehouse || '',
-    ]);
-
-    missingPieces.forEach(function(pieceNumber) {
-      missingRows.push([
-        receivingId + '-' + order.orderId + '-' + pieceNumber,
+      receivingRows.push([
+        receivingId,
         receivedAt,
         config.branch,
+        config.mode,
+        config.route,
         payload.username || '',
+        payload.truck || details.trip.truck || '',
         payload.tripId,
         order.orderId,
         order.title,
-        pieceNumber,
-        'Missing',
-        '',
-        'Open',
+        expectedPieces,
+        receivedPieces.length,
+        missingPieces.length,
+        receivedPieces.join(','),
+        missingPieces.join(','),
+        status,
+        receivedAt,
+        details.trip.departureWarehouse || config.departureWarehouse || '',
+        details.trip.destinationWarehouse || config.destinationWarehouse || '',
       ]);
+
+      missingPieces.forEach(function(pieceNumber) {
+        missingRows.push([
+          receivingId + '-' + order.orderId + '-' + pieceNumber,
+          receivedAt,
+          config.branch,
+          payload.username || '',
+          payload.tripId,
+          order.orderId,
+          order.title,
+          pieceNumber,
+          'Missing',
+          '',
+          'Open',
+        ]);
+      });
     });
-  });
 
-  appendRows_(config.sheets.receiving, RECEIVING_HEADERS, receivingRows);
-  appendRows_(config.sheets.missing, MISSING_HEADERS, missingRows);
+    appendRows_(config.sheets.receiving, RECEIVING_HEADERS, receivingRows);
+    appendRows_(config.sheets.missing, MISSING_HEADERS, missingRows);
 
-  return {
-    success: true,
-    receivingId: receivingId,
-    tripId: payload.tripId,
-    branch: config.branch,
-    mode: config.mode,
-    route: config.route,
-    user: payload.username || '',
-    truck: normalizeTruckName_(payload.truck || details.trip.truck || ''),
-    orders: receivingRows.length,
-    missing: missingRows.length,
-    closedAt: receivedAt,
-  };
+    return {
+      success: true,
+      receivingId: receivingId,
+      tripId: payload.tripId,
+      branch: config.branch,
+      mode: config.mode,
+      route: config.route,
+      user: payload.username || '',
+      truck: payload.truck || details.trip.truck || '',
+      orders: receivingRows.length,
+      missing: missingRows.length,
+      closedAt: receivedAt,
+    };
   } finally {
     lock.releaseLock();
   }
@@ -266,23 +275,6 @@ function getUnloadingConfig_(contextKey) {
   }
 
   return config;
-}
-
-function isTripForUnloadingConfig_(config, route, departureWarehouse, destinationWarehouse) {
-  if (departureWarehouse || destinationWarehouse) {
-    return String(departureWarehouse || '') === String(config.departureWarehouse || '') &&
-      String(destinationWarehouse || '') === String(config.destinationWarehouse || '');
-  }
-
-  return String(route || '') === String(config.route || '');
-}
-
-function getDepartureFromRoute_(route) {
-  return String(route || '').split(' to ')[0] || '';
-}
-
-function getDestinationFromRoute_(route) {
-  return String(route || '').split(' to ')[1] || '';
 }
 
 function ensureUnloadingSupportSheets_(config) {
@@ -307,7 +299,8 @@ function getClosedTripMap_(config) {
   for (var i = 0; i < values.length; i++) {
     if (
       String(values[i][2]) === config.branch &&
-      String(values[i][4]) === config.route &&
+      String(values[i][17]) === String(config.departureWarehouse || '') &&
+      String(values[i][18]) === String(config.destinationWarehouse || '') &&
       String(values[i][7] || '')
     ) {
       map[String(values[i][7])] = true;

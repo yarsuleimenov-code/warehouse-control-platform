@@ -61,12 +61,6 @@ const BRANCH_COLORS = {
   CA: '#cfe2f3',
 };
 
-const TRUCK_NAME_ALIASES = {
-  'Truck 1 (26-ft)': 'Truck 1 (26 ft)',
-  'Truck 2 (16-ft)': 'Truck 2 (16 ft)',
-  'Extra 26-ft': 'Extra 26 ft',
-};
-
 function getLoadingData(contextKey) {
   var config = getLoadingConfig_(contextKey);
   ensureLoadingSupportSheets_(config);
@@ -198,7 +192,7 @@ function generateLoadingTrip(contextKey, truck, username) {
       departureWarehouse: config.departureWarehouse || '',
       destinationWarehouse: config.destinationWarehouse || '',
       user: username || '',
-      truck: normalizeTruckName_(truck),
+      truck: truck,
       rows: tripRows.length,
     };
   } finally {
@@ -582,7 +576,7 @@ function buildTripRow_(config, tripId, generatedAt, username, truck, order, load
     config.branch,
     config.route,
     username || '',
-    normalizeTruckName_(truck),
+    truck,
     order.orderId,
     order.title,
     order.weight,
@@ -630,74 +624,6 @@ function applyBranchColors_(sheet, startRow, branchIndex, rows) {
   sheet.getRange(startRow, branchIndex, rows.length, 1).setBackgrounds(backgrounds);
 }
 
-function applyExistingBranchColors_(sheet, headers) {
-  var branchIndex = headers.indexOf('Branch') + 1;
-  var lastRow = sheet.getLastRow();
-
-  if (branchIndex < 1 || lastRow < 2) return;
-
-  var values = sheet.getRange(2, branchIndex, lastRow - 1, 1).getValues();
-  var backgrounds = values.map(function(row) {
-    var branch = String(row[0] || '').trim().toUpperCase();
-    return [BRANCH_COLORS[branch] || '#ffffff'];
-  });
-
-  sheet.getRange(2, branchIndex, backgrounds.length, 1).setBackgrounds(backgrounds);
-}
-
-function repaintTripReportsBranchColors() {
-  var sheet = ensureTripReportsSheet_(APP_CONFIGS.NY_LOADING.sheets.tripReports);
-  applyExistingBranchColors_(sheet, TRIP_REPORT_HEADERS);
-
-  return {
-    ok: true,
-    sheet: APP_CONFIGS.NY_LOADING.sheets.tripReports,
-  };
-}
-
-function normalizeTruckNamesInReports() {
-  var tripReportsUpdated = normalizeTruckColumn_(APP_CONFIGS.NY_LOADING.sheets.tripReports, TRIP_REPORT_HEADERS);
-  var receivingUpdated = normalizeTruckColumn_(APP_CONFIGS.NY_UNLOADING.sheets.receiving, RECEIVING_HEADERS);
-
-  return {
-    ok: true,
-    tripReportsUpdated: tripReportsUpdated,
-    receivingUpdated: receivingUpdated,
-  };
-}
-
-function normalizeTruckColumn_(sheetName, headers) {
-  var sheet = ensureSheetWithHeaders_(sheetName, headers);
-  var truckIndex = headers.indexOf('Truck') + 1;
-  var lastRow = sheet.getLastRow();
-  var updated = 0;
-
-  if (truckIndex < 1 || lastRow < 2) return updated;
-
-  var range = sheet.getRange(2, truckIndex, lastRow - 1, 1);
-  var values = range.getValues();
-
-  values.forEach(function(row) {
-    var current = String(row[0] || '');
-    var next = normalizeTruckName_(current);
-    if (next !== current) {
-      row[0] = next;
-      updated += 1;
-    }
-  });
-
-  if (updated > 0) {
-    range.setValues(values);
-  }
-
-  return updated;
-}
-
-function normalizeTruckName_(truck) {
-  var value = String(truck || '').trim();
-  return TRUCK_NAME_ALIASES[value] || value;
-}
-
 function getTextColumnIndexes_(headers) {
   var indexes = [];
 
@@ -743,27 +669,7 @@ function ensureSheetWithHeaders_(sheetName, headers) {
 }
 
 function ensureTripReportsSheet_(sheetName) {
-  var spreadsheet = getSpreadsheet_();
-  var sheet = spreadsheet.getSheetByName(sheetName);
-
-  if (!sheet) {
-    sheet = spreadsheet.insertSheet(sheetName);
-  }
-
-  var lastColumn = Math.max(sheet.getLastColumn(), TRIP_REPORT_HEADERS.length);
-  var headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
-  var modeColumn = headers.findIndex(function(header) {
-    return normalizeHeader_(header) === 'mode';
-  });
-
-  if (modeColumn !== -1) {
-    sheet.deleteColumn(modeColumn + 1);
-  }
-
-  sheet = ensureSheetWithHeaders_(sheetName, TRIP_REPORT_HEADERS);
-  applyExistingBranchColors_(sheet, TRIP_REPORT_HEADERS);
-
-  return sheet;
+  return ensureSheetWithHeaders_(sheetName, TRIP_REPORT_HEADERS);
 }
 
 function getRequiredSheet_(sheetName) {

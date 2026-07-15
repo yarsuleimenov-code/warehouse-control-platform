@@ -1,6 +1,6 @@
 const SPREADSHEET_ID = '13gYc73705Q-HVUQxDWwLKdGU4ij6i0OUbdBiKoJnWuQ';
 const APP_TIMEZONE = 'America/New_York';
-const APP_VERSION = 'stage4-warehouse-directions-2026-07-15';
+const APP_VERSION = 'stage4-cleanup-2026-07-15';
 
 const SHEETS = {
   users: 'Users',

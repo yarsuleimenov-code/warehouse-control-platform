@@ -15,8 +15,7 @@ Google Apps Script Web App for warehouse loading and unloading workflows.
   - Truck 1 (26 ft)
   - Truck 2 (16 ft)
   - Extra 26 ft
-- Placeholder dashboard after workflow selection.
-- NY/CA loading dashboard foundation:
+- NY/CA loading dashboards:
   - Orders table.
   - Weight / volume stats.
   - Pieces total editor.
@@ -27,7 +26,8 @@ Google Apps Script Web App for warehouse loading and unloading workflows.
 - Unloading MVP:
   - Select TripID.
   - Show expected pieces from TripReports.
-  - Mark received / missing pieces.
+  - Mark received pieces.
+  - Save unmarked pieces as missing on Close Trip.
   - Close trip manually.
   - Write Receiving / Missing.
 

@@ -29,23 +29,6 @@ function ensurePlatformSetup() {
   };
 }
 
-function getDashboardContext(contextKey) {
-  var config = getConfig_(contextKey);
-
-  return {
-    key: config.key,
-    label: config.label,
-    branch: config.branch,
-    mode: config.mode,
-    departureWarehouse: config.departureWarehouse,
-    destinationWarehouse: config.destinationWarehouse,
-    route: config.route,
-    tripPrefix: config.tripPrefix,
-    storageNamespace: config.storageNamespace,
-    trucks: config.trucks,
-  };
-}
-
 function getSpreadsheet_() {
   return SpreadsheetApp.openById(SPREADSHEET_ID);
 }
