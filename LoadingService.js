@@ -43,6 +43,8 @@ const TRIP_REPORT_HEADERS = [
   'Status',
   'CountPieces',
   'RemainingCountPieces',
+  'Departure Warehouse',
+  'Destination Warehouse',
 ];
 
 const COLOR_MAP = {
@@ -182,6 +184,8 @@ function generateLoadingTrip(contextKey, truck, username) {
       generatedAt: generatedAt,
       branch: config.branch,
       route: config.route,
+      departureWarehouse: config.departureWarehouse || '',
+      destinationWarehouse: config.destinationWarehouse || '',
       user: username || '',
       truck: truck,
       rows: tripRows.length,
@@ -580,6 +584,8 @@ function buildTripRow_(config, tripId, generatedAt, username, truck, order, load
     status,
     countPieces || '',
     remainingCountPieces || '',
+    config.departureWarehouse || '',
+    config.destinationWarehouse || '',
   ];
 }
 
@@ -841,6 +847,8 @@ function publicConfig_(config) {
     label: config.label,
     branch: config.branch,
     mode: config.mode,
+    departureWarehouse: config.departureWarehouse,
+    destinationWarehouse: config.destinationWarehouse,
     route: config.route,
     storageNamespace: config.storageNamespace,
   };

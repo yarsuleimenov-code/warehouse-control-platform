@@ -16,6 +16,8 @@ const RECEIVING_HEADERS = [
   'MissingCountPieces',
   'Status',
   'ClosedAt',
+  'Departure Warehouse',
+  'Destination Warehouse',
 ];
 
 const MISSING_HEADERS = [
@@ -53,8 +55,10 @@ function getUnloadingTrips(contextKey) {
   values.forEach(function(row) {
     var tripId = String(row[0] || '');
     var route = String(row[3] || '');
+    var departureWarehouse = String(row[18] || '');
+    var destinationWarehouse = String(row[19] || '');
 
-    if (!tripId || route !== config.route) return;
+    if (!tripId || !isTripForUnloadingConfig_(config, route, departureWarehouse, destinationWarehouse)) return;
     if (closedTrips[tripId]) return;
 
     if (!map[tripId]) {
@@ -63,6 +67,8 @@ function getUnloadingTrips(contextKey) {
         generatedAt: formatDateTime_(row[1]),
         sourceBranch: row[2] || '',
         route: route,
+        departureWarehouse: departureWarehouse || getDepartureFromRoute_(route),
+        destinationWarehouse: destinationWarehouse || getDestinationFromRoute_(route),
         truck: row[5] || '',
         orders: 0,
         expectedPieces: 0,
@@ -102,14 +108,20 @@ function getUnloadingTrip(contextKey, tripId) {
 
   values.forEach(function(row) {
     if (String(row[0] || '') !== String(tripId)) return;
-    if (String(row[3] || '') !== config.route) return;
+
+    var route = String(row[3] || '');
+    var departureWarehouse = String(row[18] || '');
+    var destinationWarehouse = String(row[19] || '');
+    if (!isTripForUnloadingConfig_(config, route, departureWarehouse, destinationWarehouse)) return;
 
     if (!meta) {
       meta = {
         tripId: String(row[0]),
         generatedAt: formatDateTime_(row[1]),
         sourceBranch: row[2] || '',
-        route: row[3] || '',
+        route: route,
+        departureWarehouse: departureWarehouse || getDepartureFromRoute_(route),
+        destinationWarehouse: destinationWarehouse || getDestinationFromRoute_(route),
         truck: row[5] || '',
       };
     }
@@ -205,6 +217,8 @@ function closeUnloadingTrip(contextKey, payload) {
       missingPieces.join(','),
       status,
       receivedAt,
+      details.trip.departureWarehouse || config.departureWarehouse || '',
+      details.trip.destinationWarehouse || config.destinationWarehouse || '',
     ]);
 
     missingPieces.forEach(function(pieceNumber) {
@@ -252,6 +266,23 @@ function getUnloadingConfig_(contextKey) {
   }
 
   return config;
+}
+
+function isTripForUnloadingConfig_(config, route, departureWarehouse, destinationWarehouse) {
+  if (departureWarehouse || destinationWarehouse) {
+    return String(departureWarehouse || '') === String(config.departureWarehouse || '') &&
+      String(destinationWarehouse || '') === String(config.destinationWarehouse || '');
+  }
+
+  return String(route || '') === String(config.route || '');
+}
+
+function getDepartureFromRoute_(route) {
+  return String(route || '').split(' to ')[0] || '';
+}
+
+function getDestinationFromRoute_(route) {
+  return String(route || '').split(' to ')[1] || '';
 }
 
 function ensureUnloadingSupportSheets_(config) {

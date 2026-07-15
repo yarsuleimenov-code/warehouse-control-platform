@@ -37,6 +37,8 @@ function getDashboardContext(contextKey) {
     label: config.label,
     branch: config.branch,
     mode: config.mode,
+    departureWarehouse: config.departureWarehouse,
+    destinationWarehouse: config.destinationWarehouse,
     route: config.route,
     tripPrefix: config.tripPrefix,
     storageNamespace: config.storageNamespace,

@@ -565,7 +565,7 @@
       const rows = (unloadingTripData.orders || []).filter(order => matchesUnloadingSearch(order, search));
 
       panel.classList.remove('hidden');
-      meta.textContent = `TripID: ${trip.tripId} | Source: ${trip.sourceBranch} | Route: ${trip.route} | Truck: ${trip.truck}`;
+      meta.textContent = `TripID: ${trip.tripId} | From: ${trip.departureWarehouse || ''} | To: ${trip.destinationWarehouse || ''} | Truck: ${trip.truck}`;
 
       document.getElementById('unloading-orders-body').innerHTML = rows.length ? rows.map(order => {
         const state = unloadingState[order.orderId] || { receivedPieces: [] };
@@ -1099,6 +1099,8 @@
             <tr><th>TripID</th><td><strong>${escapeHtml(result.tripId)}</strong></td></tr>
             <tr><th>Generated</th><td>${escapeHtml(result.generatedAt || '')}</td></tr>
             <tr><th>Branch</th><td>${escapeHtml(result.branch || '')}</td></tr>
+            <tr><th>Departure Warehouse</th><td>${escapeHtml(result.departureWarehouse || '')}</td></tr>
+            <tr><th>Destination Warehouse</th><td>${escapeHtml(result.destinationWarehouse || '')}</td></tr>
             <tr><th>Route</th><td>${escapeHtml(result.route || '')}</td></tr>
             <tr><th>Truck</th><td><strong>${escapeHtml(result.truck || '')}</strong></td></tr>
             <tr><th>User</th><td>${escapeHtml(result.user || '')}</td></tr>

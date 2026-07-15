@@ -1,6 +1,6 @@
 const SPREADSHEET_ID = '13gYc73705Q-HVUQxDWwLKdGU4ij6i0OUbdBiKoJnWuQ';
 const APP_TIMEZONE = 'America/New_York';
-const APP_VERSION = 'stage4-tripreports-no-mode-2026-07-03';
+const APP_VERSION = 'stage4-warehouse-directions-2026-07-15';
 
 const SHEETS = {
   users: 'Users',
@@ -18,6 +18,8 @@ const APP_CONFIGS = {
     label: 'NY Loading',
     branch: 'NY',
     mode: 'loading',
+    departureWarehouse: 'NY',
+    destinationWarehouse: 'CA',
     route: 'NY to CA',
     tripPrefix: 'NY-L',
     storageNamespace: 'warehouse-control:v1:ny:loading',
@@ -34,6 +36,8 @@ const APP_CONFIGS = {
     label: 'CA Loading',
     branch: 'CA',
     mode: 'loading',
+    departureWarehouse: 'CA',
+    destinationWarehouse: 'NY',
     route: 'CA to NY',
     tripPrefix: 'CA-L',
     storageNamespace: 'warehouse-control:v1:ca:loading',
@@ -50,6 +54,8 @@ const APP_CONFIGS = {
     label: 'NY Unloading',
     branch: 'NY',
     mode: 'unloading',
+    departureWarehouse: 'CA',
+    destinationWarehouse: 'NY',
     route: 'CA to NY',
     tripPrefix: 'NY-U',
     storageNamespace: 'warehouse-control:v1:ny:unloading',
@@ -66,6 +72,8 @@ const APP_CONFIGS = {
     label: 'CA Unloading',
     branch: 'CA',
     mode: 'unloading',
+    departureWarehouse: 'NY',
+    destinationWarehouse: 'CA',
     route: 'NY to CA',
     tripPrefix: 'CA-U',
     storageNamespace: 'warehouse-control:v1:ca:unloading',
@@ -87,6 +95,8 @@ function getPublicConfigs_() {
       label: config.label,
       branch: config.branch,
       mode: config.mode,
+      departureWarehouse: config.departureWarehouse,
+      destinationWarehouse: config.destinationWarehouse,
       route: config.route,
       tripPrefix: config.tripPrefix,
       storageNamespace: config.storageNamespace,
