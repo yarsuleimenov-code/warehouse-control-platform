@@ -69,7 +69,7 @@ function getUnloadingTrips(contextKey) {
         route: route,
         departureWarehouse: departureWarehouse || getDepartureFromRoute_(route),
         destinationWarehouse: destinationWarehouse || getDestinationFromRoute_(route),
-        truck: row[5] || '',
+        truck: normalizeTruckName_(row[5]),
         orders: 0,
         expectedPieces: 0,
       };
@@ -122,7 +122,7 @@ function getUnloadingTrip(contextKey, tripId) {
         route: route,
         departureWarehouse: departureWarehouse || getDepartureFromRoute_(route),
         destinationWarehouse: destinationWarehouse || getDestinationFromRoute_(route),
-        truck: row[5] || '',
+        truck: normalizeTruckName_(row[5]),
       };
     }
 
@@ -206,7 +206,7 @@ function closeUnloadingTrip(contextKey, payload) {
       config.mode,
       config.route,
       payload.username || '',
-      payload.truck || details.trip.truck || '',
+      normalizeTruckName_(payload.truck || details.trip.truck || ''),
       payload.tripId,
       order.orderId,
       order.title,
@@ -249,7 +249,7 @@ function closeUnloadingTrip(contextKey, payload) {
     mode: config.mode,
     route: config.route,
     user: payload.username || '',
-    truck: payload.truck || details.trip.truck || '',
+    truck: normalizeTruckName_(payload.truck || details.trip.truck || ''),
     orders: receivingRows.length,
     missing: missingRows.length,
     closedAt: receivedAt,
