@@ -2,6 +2,18 @@
 
 Google Apps Script Web App for warehouse loading and unloading workflows.
 
+## Documentation
+
+The current implementation and functional handoff for future mobile application design are documented here:
+
+- [Current system](docs/CURRENT_SYSTEM.md)
+- [Business processes](docs/BUSINESS_PROCESSES.md)
+- [Data model](docs/DATA_MODEL.md)
+- [Mobile app handoff](docs/MOBILE_APP_HANDOFF.md)
+- [Open business questions](docs/OPEN_QUESTIONS.md)
+
+These documents distinguish current code behavior from future requirements and unresolved decisions. They do not define a mobile technology stack or wireframe.
+
 ## MVP Scope
 
 - One Web App URL.
