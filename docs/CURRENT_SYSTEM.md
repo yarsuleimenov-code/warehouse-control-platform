@@ -12,6 +12,7 @@
 - загрузка заказов на уровне заказа или отдельных pieces;
 - локальное хранение несохранённых изменений Loading в браузере;
 - формирование снимка рейса в `TripReports`;
+- уведомление отдельного Interstate BOL сервиса после создания рейса;
 - поиск открытого рейса по направлению;
 - сверка pieces при выгрузке;
 - закрытие рейса с записью `Receiving` и созданием строк `Missing`.
@@ -33,6 +34,8 @@
 Активность контролируется `Users.Active`. Имя пользователя записывается в отчётные строки. Пароли хранятся открытым текстом.
 
 Ограничение: после `login()` серверная сессия не создаётся. Браузер хранит username и выбранный workflow в `localStorage`, а серверные write-методы повторно проверяют только наличие активного пользователя и доступ к workflow.
+
+Web App может быть опубликован с широким Google-level доступом; фактическое ограничение workflow в MVP выполняется через внутренний login и `Users.Access`.
 
 ## 3. Конфигурация процессов
 
@@ -63,7 +66,7 @@
 | `LoadingService.js` | Чтение Orders, piece tracking, сохранение Loading, создание `TripReports`, общие helpers Sheets |
 | `UnloadingService.js` | Поиск и чтение рейсов, Close Trip, `Receiving`, `Missing` |
 | `Index.html` | Весь UI, состояние браузера, localStorage queue/cache, вызовы `google.script.run` |
-| `appsscript.json` | V8 runtime, timezone, Spreadsheet OAuth scope |
+| `appsscript.json` | V8 runtime, timezone, OAuth scopes, pinned `InterstateBol` library |
 
 Разделение по Loading/Unloading понятно для MVP. При этом `LoadingService.js` также содержит общие функции работы с листами, датами и заголовками.
 
@@ -76,8 +79,9 @@
 - `Utilities.formatDate()` для дат и идентификаторов.
 - `google.script.run` для browser-to-server RPC.
 - Browser `localStorage` для сессии, кэша Orders/Pieces и pending queue.
+- Apps Script library `InterstateBol` для постановки созданного TripID в очередь генерации BOL.
 
-Сторонние библиотеки и внешние API отсутствуют.
+Прямых HTTP-вызовов из Warehouse Control code нет; BOL-обработка выполняется отдельной подключённой библиотекой. Ошибка уведомления BOL логируется и возвращается в результат, но не откатывает уже созданный `TripReports`.
 
 ## 6. Google Spreadsheet
 
@@ -110,6 +114,7 @@ flowchart LR
     GAS --> UNLOAD["UnloadingService.js"]
     AUTH --> SHEETS["Google Spreadsheet"]
     LOAD --> SHEETS
+    LOAD --> BOL["InterstateBol library"]
     UNLOAD --> SHEETS
 ```
 
@@ -121,8 +126,9 @@ flowchart LR
 4. Loading читает Orders, OrderPieces и TripReports.
 5. Pending Loading changes сохраняются локально и затем отправляются на сервер.
 6. Generate Trip добавляет строки в `TripReports`.
-7. Unloading выбирает незакрытый TripID по направлению.
-8. Close Trip добавляет строки в `Receiving`, затем `Missing`.
+7. После успешной записи TripReports Warehouse Control вызывает `InterstateBol.enqueueInterstateBolTrip(TripID, Route)`.
+8. Unloading выбирает незакрытый TripID по направлению.
+9. Close Trip добавляет строки в `Receiving`, затем `Missing`.
 
 ## 8. Локальное хранение и «offline-friendly» поведение
 
@@ -150,13 +156,14 @@ flowchart LR
 ## 9. Подтверждённые ограничения
 
 - Browser session не является серверной authenticated session.
+- Google-level Web App access не заменяет внутреннюю проверку `Users`; текущая безопасность MVP зависит от простого login/password в Spreadsheet.
 - `saveLoadingChanges()` выполняет несколько независимых записей без общего lock.
 - `OrderPieces` при сохранении читается и записывается целиком.
 - `Receiving` и `Missing` записываются последовательно, не как единая восстанавливаемая операция.
 - TripID/ReceivingID имеют точность до минуты.
 - Updates PiecesTotal/LoadedPieces адресуются номером строки Orders.
 - Фотографии и ссылки на них отсутствуют.
-- Нет автоматизированных тестов или формального API-контракта.
+- Есть минимальный локальный unit test для BOL notification; полного тестового покрытия и формального API-контракта нет.
 - Добавление склада требует новых workflow, листов Orders/OrderPieces и изменения setup-кода.
 
 Эти ограничения нужно учитывать как риски и исходные данные, а не переносить механически в будущее приложение.

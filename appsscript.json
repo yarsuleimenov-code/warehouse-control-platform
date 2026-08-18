@@ -2,7 +2,23 @@
   "timeZone": "America/New_York",
   "exceptionLogging": "STACKDRIVER",
   "runtimeVersion": "V8",
+  "dependencies": {
+    "libraries": [
+      {
+        "userSymbol": "InterstateBol",
+        "libraryId": "1cPvKKlQI1L1sNGR75lvvYZ3ByY4S5bhgA2VUcQc6jDuIttn-Zz7wiXFM",
+        "version": "1",
+        "developmentMode": false
+      }
+    ]
+  },
   "oauthScopes": [
-    "https://www.googleapis.com/auth/spreadsheets"
-  ]
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://www.googleapis.com/auth/script.scriptapp"
+  ],
+  "webapp": {
+    "executeAs": "USER_DEPLOYING",
+    "access": "ANYONE_ANONYMOUS"
+  }
 }

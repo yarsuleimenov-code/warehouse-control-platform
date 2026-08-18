@@ -150,6 +150,7 @@ function generateLoadingTrip(contextKey, truck, username) {
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
 
+  var result;
   try {
     var data = getLoadingData(contextKey);
     var reportedMap = getReportedLoadedPiecesMap_(config);
@@ -183,7 +184,7 @@ function generateLoadingTrip(contextKey, truck, username) {
 
     appendRows_(config.sheets.tripReports, TRIP_REPORT_HEADERS, tripRows);
 
-    return {
+    result = {
       success: true,
       tripId: tripId,
       generatedAt: generatedAt,
@@ -197,6 +198,24 @@ function generateLoadingTrip(contextKey, truck, username) {
     };
   } finally {
     lock.releaseLock();
+  }
+
+  result.bolNotification = notifyInterstateBol_(result.tripId, result.route);
+  return result;
+}
+
+function notifyInterstateBol_(tripId, route) {
+  try {
+    return InterstateBol.enqueueInterstateBolTrip(tripId, route);
+  } catch (error) {
+    console.error('BOL notification failed for ' + tripId, error);
+    return {
+      ok: false,
+      queued: false,
+      tripId: tripId,
+      status: 'NOTIFICATION_FAILED',
+      error: String(error && error.message ? error.message : error)
+    };
   }
 }
 

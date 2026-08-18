@@ -93,6 +93,8 @@ Trip не имеет отдельной master row. Он представлен 
 
 TripID не гарантированно уникален: точность генерации — одна минута.
 
+После создания строк Warehouse Control передаёт `TripID` и `Route` во внешнюю библиотеку `InterstateBol`. BOL queue, registry, PDF URL и lifecycle BOL хранятся не в Warehouse Control spreadsheet, а в отдельном BOL-сервисе.
+
 ### 2.5 Unloading result — `Receiving`
 
 Одна строка создаётся для каждого Order row выбранного TripID.

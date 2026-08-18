@@ -11,6 +11,7 @@ The current implementation and functional handoff for future mobile application 
 - [Data model](docs/DATA_MODEL.md)
 - [Mobile app handoff](docs/MOBILE_APP_HANDOFF.md)
 - [Open business questions](docs/OPEN_QUESTIONS.md)
+- [Loading Control and Interstate BOL user guide](docs/USER_GUIDE_LOADING_CONTROL_AND_BOL.md)
 
 These documents distinguish current code behavior from future requirements and unresolved decisions. They do not define a mobile technology stack or wireframe.
 
@@ -35,6 +36,7 @@ These documents distinguish current code behavior from future requirements and u
   - Offline pending queue.
   - Save pending changes.
 - Generate Trip snapshot.
+- Notify the separate Interstate BOL library after `TripReports` is written; notification failure does not roll back the trip.
 - Unloading MVP:
   - Select TripID.
   - Show expected pieces from TripReports.
@@ -86,6 +88,7 @@ LoadingService.js
 UnloadingService.js
 Index.html
 appsscript.json
+.clasp.json
 ```
 
 ## Orders Sheet Contract
@@ -117,13 +120,16 @@ Rows without `OrderID/ID` or without a supported `ColorCode` are skipped.
 
 1. Create a new Google Apps Script project.
 2. Add the files from this repository.
-3. Run `ensurePlatformSetup()` once from Apps Script editor and grant permissions.
-4. Confirm the `Users` sheet exists in the Warehouse Control Platform spreadsheet.
-5. Deploy as Web App:
+3. Save the current Interstate BOL project code and confirm that library version `1` or the version configured in `appsscript.json` exists.
+4. Confirm the pinned `InterstateBol` library dependency is available and `developmentMode` is `false`.
+5. Run `ensurePlatformSetup()` once from Apps Script editor and grant permissions.
+6. Confirm the `Users` sheet exists in the Warehouse Control Platform spreadsheet.
+7. Deploy as Web App:
    - Execute as: Me
-   - Who has access: users allowed by the business process
-6. Open the Web App URL.
-7. Add at least one active user to `Users`, then login with that user's credentials.
+   - Who has access: anyone allowed by the business process; the MVP relies on the app login and `Users.Access` for workflow access
+8. Open the Web App URL.
+9. Add at least one active user to `Users`, then login with that user's credentials.
+10. For later BOL changes, create a new numbered library version and update the pinned version in `appsscript.json` before deploying Warehouse Control.
 
 ```text
 Username: <Users sheet username>
@@ -133,3 +139,16 @@ Password: <Users sheet password>
 ## Notes
 
 Passwords are stored as plain text for MVP speed only. Replace with hashes before broader rollout.
+
+## Tests
+
+Run the current local smoke/unit checks with bundled Node.js or any Node.js runtime:
+
+```text
+node --check Code.js
+node --check Config.js
+node --check Auth.js
+node --check LoadingService.js
+node --check UnloadingService.js
+node tests/bol_notification.test.js
+```

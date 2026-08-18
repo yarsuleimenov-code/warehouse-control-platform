@@ -32,4 +32,4 @@
 
 Stage 6: Hardening.
 
-Loading and unloading MVP are implemented. Keep changes minimal and avoid business-logic changes unless a production test exposes a real issue.
+Loading, unloading, and Interstate BOL notification MVP are implemented. Keep changes minimal and avoid business-logic changes unless a production test exposes a real issue.
