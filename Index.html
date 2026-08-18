@@ -179,11 +179,24 @@
       border-color: #94c47d;
     }
 
+    .unloading-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .mark-all-received,
     .close-trip {
       width: min(100%, 360px);
       min-height: 56px;
       font-size: 16px;
-      margin-top: 10px;
+    }
+
+    .mark-all-received {
+      border-color: var(--green);
+      background: #e6f4ea;
+      color: var(--green);
     }
 
     .open-pieces {
@@ -228,6 +241,7 @@
       th, td { padding: 5px; }
       .orders .title { min-width: 190px; }
       .orders .hide-mobile { display: none; }
+      .unloading-actions button { width: 100%; }
     }
   </style>
 </head>
@@ -356,7 +370,8 @@
               <tbody id="unloading-orders-body"></tbody>
             </table>
           </div>
-          <div class="toolbar">
+          <div class="toolbar unloading-actions">
+            <button id="mark-all-received-button" class="mark-all-received" onclick="markAllUnloadingReceived()">Mark All Received</button>
             <button id="close-trip-button" class="primary close-trip" onclick="closeUnloadingTrip()">Close Trip</button>
           </div>
         </div>
@@ -628,6 +643,36 @@
 
       state.receivedPieces.sort((a, b) => a - b);
       renderUnloadingTrip();
+    }
+
+    function markAllUnloadingReceived() {
+      if (!unloadingTripData || !Array.isArray(unloadingTripData.orders)) {
+        setAppStatus('Open TripID first.', 'error');
+        return;
+      }
+
+      const summary = getUnloadingSummary();
+      if (summary.missingPieces === 0) {
+        setAppStatus('All pieces are already marked as received.', 'success');
+        return;
+      }
+
+      if (!confirm(`Mark all ${summary.expectedPieces} expected pieces as received? Review before Close Trip.`)) {
+        return;
+      }
+
+      unloadingTripData.orders.forEach(order => {
+        const pieces = order.expectedCountPieces && order.expectedCountPieces.length
+          ? order.expectedCountPieces
+          : Array.from({ length: order.expectedPieces }, (_, index) => index + 1);
+
+        unloadingState[order.orderId] = {
+          receivedPieces: [...pieces].sort((a, b) => a - b),
+        };
+      });
+
+      renderUnloadingTrip();
+      setAppStatus('All expected pieces marked as received locally. Review and press Close Trip.', 'warning');
     }
 
     function renderUnloadingOrderStatus(order, state) {
