@@ -126,9 +126,10 @@ flowchart LR
 4. Loading читает Orders, OrderPieces и TripReports.
 5. Pending Loading changes сохраняются локально и затем отправляются на сервер.
 6. Generate Trip добавляет строки в `TripReports`.
-7. После успешной записи TripReports Warehouse Control вызывает `InterstateBol.enqueueInterstateBolTrip(TripID, Route)`.
-8. Unloading выбирает незакрытый TripID по направлению.
-9. Close Trip добавляет строки в `Receiving`, затем `Missing`.
+7. Для полностью отправленных строк и пустых строк без OrderID очищается ручной `Pieces` в Orders.
+8. После успешной записи TripReports Warehouse Control вызывает `InterstateBol.enqueueInterstateBolTrip(TripID, Route)`.
+9. Unloading выбирает незакрытый TripID по направлению.
+10. Close Trip добавляет строки в `Receiving`, затем `Missing`.
 
 ## 8. Локальное хранение и «offline-friendly» поведение
 

@@ -157,6 +157,7 @@ function generateLoadingTrip(contextKey, truck, username) {
     var tripId = config.tripPrefix + '-' + Utilities.formatDate(new Date(), APP_TIMEZONE, 'yyMMdd-HHmm');
     var generatedAt = formatDateTime_(new Date());
     var tripRows = [];
+    var completedOrders = [];
 
     data.orders.forEach(function(order) {
       var reported = reportedMap[order.orderId] || { loadedPieces: 0, pieceNumbers: {} };
@@ -176,6 +177,9 @@ function generateLoadingTrip(contextKey, truck, username) {
       var row = buildTripRow_(config, tripId, generatedAt, username, truck, order, loadedPieces, remainingPieces, status, countPieces, remainingCountPieces);
 
       tripRows.push(row);
+      if (status === 'Completed') {
+        completedOrders.push(order);
+      }
     });
 
     if (!tripRows.length) {
@@ -183,6 +187,7 @@ function generateLoadingTrip(contextKey, truck, username) {
     }
 
     appendRows_(config.sheets.tripReports, TRIP_REPORT_HEADERS, tripRows);
+    clearCompletedAndOrphanPiecesInputs_(config, completedOrders);
 
     result = {
       success: true,
@@ -202,6 +207,40 @@ function generateLoadingTrip(contextKey, truck, username) {
 
   result.bolNotification = notifyInterstateBol_(result.tripId, result.route);
   return result;
+}
+
+function clearCompletedAndOrphanPiecesInputs_(config, completedOrders) {
+  var sheet = getRequiredSheet_(config.sheets.orders);
+  var read = readOrders_(sheet);
+
+  if (!read.rows.length || read.headerMap.piecesTotal === undefined) return 0;
+
+  var completedByRow = {};
+  (completedOrders || []).forEach(function(order) {
+    completedByRow[Number(order.row)] = String(order.orderId);
+  });
+
+  var range = sheet.getRange(2, read.headerMap.piecesTotal + 1, read.rows.length, 1);
+  var values = range.getValues();
+  var cleared = 0;
+
+  read.rows.forEach(function(row, index) {
+    var rowNumber = index + 2;
+    var orderId = String(getCell_(row, read.headerMap.orderId) || '');
+    var completedOrderId = completedByRow[rowNumber];
+    var shouldClear = !orderId || (completedOrderId && completedOrderId === orderId);
+
+    if (shouldClear && values[index][0] !== '') {
+      values[index][0] = '';
+      cleared += 1;
+    }
+  });
+
+  if (cleared > 0) {
+    range.setValues(values);
+  }
+
+  return cleared;
 }
 
 function notifyInterstateBol_(tripId, route) {
