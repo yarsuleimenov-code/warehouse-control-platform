@@ -60,8 +60,7 @@ function getUnloadingTrips(contextKey) {
 
     if (
       !tripId ||
-      departureWarehouse !== String(config.departureWarehouse || '') ||
-      destinationWarehouse !== String(config.destinationWarehouse || '')
+      route !== String(config.route || '')
     ) {
       return;
     }
@@ -118,8 +117,7 @@ function getUnloadingTrip(contextKey, tripId) {
     var departureWarehouse = String(row[18] || '');
     var destinationWarehouse = String(row[19] || '');
     if (
-      departureWarehouse !== String(config.departureWarehouse || '') ||
-      destinationWarehouse !== String(config.destinationWarehouse || '')
+      route !== String(config.route || '')
     ) {
       return;
     }
@@ -141,6 +139,8 @@ function getUnloadingTrip(contextKey, tripId) {
       expectedPieces: Math.max(0, toNumber_(row[13])),
       expectedCountPieces: parsePieceList_(row[16]),
       receivedPieces: [],
+      departureWarehouse: departureWarehouse,
+      destinationWarehouse: destinationWarehouse,
     });
   });
 
@@ -226,8 +226,8 @@ function closeUnloadingTrip(contextKey, payload) {
         missingPieces.join(','),
         status,
         receivedAt,
-        details.trip.departureWarehouse || config.departureWarehouse || '',
-        details.trip.destinationWarehouse || config.destinationWarehouse || '',
+        order.departureWarehouse || details.trip.departureWarehouse || config.departureWarehouse || '',
+        order.destinationWarehouse || details.trip.destinationWarehouse || config.destinationWarehouse || '',
       ]);
 
       missingPieces.forEach(function(pieceNumber) {
@@ -299,8 +299,7 @@ function getClosedTripMap_(config) {
   for (var i = 0; i < values.length; i++) {
     if (
       String(values[i][2]) === config.branch &&
-      String(values[i][17]) === String(config.departureWarehouse || '') &&
-      String(values[i][18]) === String(config.destinationWarehouse || '') &&
+      String(values[i][4]) === String(config.route || '') &&
       String(values[i][7] || '')
     ) {
       map[String(values[i][7])] = true;

@@ -42,9 +42,9 @@ Scope будущего приложения ограничен:
 | Warehouse/workflow selection | Да | `Config.js`, `Index.html` | Контекст ограничивает доступные операции | Warehouse model и назначения |
 | Truck selection | Да | `Config.js`, `Index.html` | Операция связана с truck | Truck identity, availability, validation |
 | Loading orders list | Да | `LoadingService.js` | Поиск, фильтры, statuses, order summary | Assignment/download scope |
-| PiecesTotal editing | Да | `LoadingService.js`, `Index.html` | Возможность уточнить количество мест | Authority, audit, conflicts |
+| PiecesTotal editing | Да | `OrderLoadingState` по Branch + OrderID | Значение не зависит от строки Orders | Authority, audit, conflict versioning |
 | Piece-level loading | Да | `OrderPieces_*` | Отметка отдельного cargo item | Stable item ID, scan/barcode rules |
-| Count-only loading | Да | Orders.LoadedPieces | Нужен бизнес-ответ: сохранять ли fallback | Целевая модель неизвестных pieces |
+| Count-only loading | Да | `OrderPieces_*` по OrderID | Нужен бизнес-ответ: сохранять ли fallback | Целевая модель неизвестных pieces |
 | Local Loading drafts | Частично | `localStorage` | Изменения не должны теряться без сети | Durable local store и queue states |
 | Generate Trip | Да | `generateLoadingTrip()` | Фиксация только новой загруженной части | Trip master/lifecycle, idempotency |
 | Trip search for Unloading | Да | `getUnloadingTrips()` | Route и closed state ограничивают список | Assignment, pagination, download |

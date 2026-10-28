@@ -32,10 +32,11 @@
 1. Сервер выбирает `Orders_NY` либо `Orders_CA`.
 2. Заголовки сопоставляются через aliases.
 3. Строки без OrderID либо поддерживаемого ColorCode пропускаются.
-4. Для заказа с PiecesTotal состояние берётся из `OrderPieces_*`.
-5. Для заказа без PiecesTotal используется числовой `LoadedPieces` из Orders.
-6. Из `TripReports` определяется, был ли заказ ранее включён в рейс и есть ли remaining pieces.
-7. UI показывает orders, filters, status и агрегаты Weight/Volume.
+4. PiecesTotal берётся из `OrderLoadingState` по Branch + OrderID; Orders.PiecesTotal используется только как fallback до первого Save в приложении.
+5. Для заказа с PiecesTotal состояние pieces берётся из `OrderPieces_*`.
+6. Для заказа без PiecesTotal количество загруженных мест считается по загруженным строкам `OrderPieces_*`, связанным с OrderID.
+7. Из `TripReports` определяется, был ли заказ ранее включён в рейс и есть ли remaining pieces.
+8. UI показывает orders, filters, status и агрегаты Weight/Volume.
 
 **Статусы заказа:**
 
@@ -56,10 +57,10 @@
 
 1. Пользователь задаёт целое неотрицательное значение.
 2. Изменение попадает в browser pending queue.
-3. При Save сервер записывает значение в строку Orders.
+3. При Save сервер проверяет наличие OrderID в актуальном Orders и записывает значение в `OrderLoadingState` по ключу Branch + OrderID.
 4. Для положительного total создаются отсутствующие номера `1..PiecesTotal` в `OrderPieces_*`.
 
-**Изменяемые записи:** Orders.PiecesTotal и новые строки OrderPieces.
+**Изменяемые записи:** OrderLoadingState и новые строки OrderPieces. Номер строки Orders не используется как ключ.
 
 **Ограничения:** уменьшение total не удаляет старые piece rows; UI продолжает показывать loaded pieces выше нового total.
 
@@ -80,7 +81,7 @@
 
 ### 2.4 Заказ с неизвестным PiecesTotal
 
-Пользователь меняет числовой LoadedPieces без детализации по cargo items. Значение хранится непосредственно в Orders.LoadedPieces. Такой режим является текущим MVP fallback и не создаёт идентичность отдельных грузовых мест.
+Пользователь меняет числовой LoadedPieces без открытия детализации cargo items. Система сохраняет count-only состояние в `OrderPieces_*` как последовательные PieceNumber, связанные с OrderID. Колонка `Orders.LoadedPieces` не используется, потому что строки Orders обновляются и могут менять соответствие OrderID.
 
 ### 2.5 Save
 
@@ -91,6 +92,8 @@
 1. PiecesTotal updates.
 2. Unknown LoadedPieces updates.
 3. Piece-level updates.
+
+Все изменения одного Save сериализуются общим script lock одного проекта. Это не предотвращает перезапись устаревшим клиентским состоянием и не создаёт транзакцию между листами.
 
 После success UI удаляет pending queue и повторно загружает данные.
 
@@ -141,7 +144,7 @@
 **Действия:**
 
 1. Система читает `TripReports`.
-2. Оставляет строки с departure/destination текущего workflow.
+2. Оставляет строки с точным Route текущего workflow; departure/destination сохраняются из snapshot каждой строки.
 3. Исключает TripID, уже найденные в `Receiving`.
 4. Группирует строки по TripID.
 5. Показывает truck, число строк-заказов и сумму LoadedPieces.

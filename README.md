@@ -2,6 +2,14 @@
 
 Google Apps Script Web App for warehouse loading and unloading workflows.
 
+## Pre-QR local baseline (2026-10-28)
+
+Loading Control leads the operational workflows; QR will adapt to its data and processes. **This is a local baseline candidate; correspondence to the published Apps Script version is not confirmed.**
+
+Read [baseline and local audit](docs/BASELINE_LOADING_CONTROL.md), then [QR integration plan](docs/QR_INTEGRATION_PLAN.md), then the process/data documents below. The audit records preserved application changes, checks and release blockers. This checkout is the versioned candidate; the parent workspace contains an earlier upload copy targeting the same Script ID. Parent baseline/plan documents are retained as historical copies; continue updating the versioned documents here.
+
+This stage saves the existing local state in GitHub only. Do not follow the deployment/setup instructions below during this stage. QR integration, Apps Script publication, production writes and access changes are out of scope.
+
 ## Documentation
 
 The current implementation and functional handoff for future mobile application design are documented here:
@@ -111,10 +119,11 @@ DeliveryDate or Delivery date
 ColorCode
 Weight
 PiecesTotal or Pieces
-LoadedPieces
 ```
 
 Rows without `OrderID/ID` or without a supported `ColorCode` are skipped.
+The legacy `Orders.LoadedPieces` column is ignored. Count-only loading state is stored by `OrderID` in the branch `OrderPieces_*` sheet so refreshed order rows cannot inherit another order's loading state.
+After the first in-app Save, `PiecesTotal` is stored in `OrderLoadingState` by `Branch + OrderID`. The value in `Orders.PiecesTotal` is only a legacy fallback for orders that have not yet been saved in the app.
 
 ## First Deployment
 
@@ -151,4 +160,5 @@ node --check Auth.js
 node --check LoadingService.js
 node --check UnloadingService.js
 node tests/bol_notification.test.js
+node tests/loading_state.test.js
 ```

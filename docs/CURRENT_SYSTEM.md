@@ -94,6 +94,7 @@ Spreadsheet ID зафиксирован в `Config.js`. Используются
 | `Orders_CA` | Исходные заказы CA для Loading | Должен существовать |
 | `OrderPieces_NY` | Состояние отдельных pieces NY | Создаётся автоматически |
 | `OrderPieces_CA` | Состояние отдельных pieces CA | Создаётся автоматически |
+| `OrderLoadingState` | PiecesTotal по ключу Branch + OrderID | Создаётся автоматически |
 | `TripReports` | Append-only снимки сформированных рейсов | Создаётся автоматически |
 | `Receiving` | Результаты закрытых Unloading trips по заказам | Создаётся автоматически |
 | `Missing` | Отдельная строка на каждую отсутствующую piece | Создаётся автоматически |
@@ -123,10 +124,10 @@ flowchart LR
 1. Web App получает публичную конфигурацию.
 2. Пользователь входит по username/password.
 3. UI сохраняет выбранный контекст в `localStorage` на 12 часов.
-4. Loading читает Orders, OrderPieces и TripReports.
+4. Loading читает Orders, OrderLoadingState, OrderPieces и TripReports.
 5. Pending Loading changes сохраняются локально и затем отправляются на сервер.
 6. Generate Trip добавляет строки в `TripReports`.
-7. Для полностью отправленных строк и пустых строк без OrderID очищается ручной `Pieces` в Orders.
+7. Для полностью отправленных строк и пустых строк без OrderID очищается legacy-значение `Pieces` в Orders; состояние по OrderID сохраняется в OrderLoadingState.
 8. После успешной записи TripReports Warehouse Control вызывает `InterstateBol.enqueueInterstateBolTrip(TripID, Route)`.
 9. Unloading выбирает незакрытый TripID по направлению.
 10. Close Trip добавляет строки в `Receiving`, затем `Missing`.
@@ -158,11 +159,11 @@ flowchart LR
 
 - Browser session не является серверной authenticated session.
 - Google-level Web App access не заменяет внутреннюю проверку `Users`; текущая безопасность MVP зависит от простого login/password в Spreadsheet.
-- `saveLoadingChanges()` выполняет несколько независимых записей без общего lock.
+- `saveLoadingChanges()` сериализует изменения общим script lock, но записи в несколько листов не являются транзакцией Google Sheets.
 - `OrderPieces` при сохранении читается и записывается целиком.
 - `Receiving` и `Missing` записываются последовательно, не как единая восстанавливаемая операция.
 - TripID/ReceivingID имеют точность до минуты.
-- Updates PiecesTotal/LoadedPieces адресуются номером строки Orders.
+- PiecesTotal сохраняется в `OrderLoadingState` по Branch + OrderID; count-only LoadedPieces — в `OrderPieces_*` по OrderID и PieceNumber. Номер строки Orders используется только в UI и не является ключом сохранения.
 - Фотографии и ссылки на них отсутствуют.
 - Есть минимальный локальный unit test для BOL notification; полного тестового покрытия и формального API-контракта нет.
 - Добавление склада требует новых workflow, листов Orders/OrderPieces и изменения setup-кода.

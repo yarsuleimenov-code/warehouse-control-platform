@@ -38,8 +38,8 @@
 | colorCode | `ColorCode`, `Color` | `1/2/3` или red/yellow/green | Да | Фильтрация строки и группировка |
 | weight | `Weight` | number | Нет | Статистика и TripReports |
 | loaded | `Loaded` | unknown | Нет | Распознаётся, но не используется |
-| piecesTotal | `PiecesTotal`, `Pieces` | positive integer | Нет | Выбор piece-level режима |
-| loadedPieces | `LoadedPieces` | non-negative integer | Условно | Используется только без PiecesTotal |
+| piecesTotal | `PiecesTotal`, `Pieces` | positive integer | Нет | Legacy fallback до первого Save по OrderID |
+| loadedPieces | `LoadedPieces` | non-negative integer | Нет | Legacy-колонка Orders; текущим кодом не читается из-за нестабильности строк |
 
 Строка без orderId или валидного colorCode не входит в приложение.
 
@@ -62,7 +62,19 @@
 
 При уменьшении PiecesTotal старые rows не удаляются. Загруженные pieces выше нового total всё ещё могут читаться.
 
-### 2.4 Trip / Loading snapshot — `TripReports`
+### 2.4 Loading state — `OrderLoadingState`
+
+| Поле | Тип | Обяз. | Источник / правило |
+| --- | --- | ---: | --- |
+| Branch | string | Да | Workflow config |
+| OrderID | string | Да | Актуальный Order |
+| PiecesTotal | non-negative integer | Да | `0` означает явно очищенное значение |
+| UpdatedAt | datetime/string | Да | Server time последнего Save |
+| UpdatedBy | string | Нет | Username последнего Save |
+
+Логический уникальный ключ: `Branch + OrderID`. После появления записи она имеет приоритет над нестабильной колонкой `Orders.PiecesTotal`, поэтому обновление или пересортировка Orders не переносит total на другой заказ.
+
+### 2.5 Trip / Loading snapshot — `TripReports`
 
 Trip не имеет отдельной master row. Он представлен группой rows по TripID; каждая строка — часть одного Order в конкретной генерации.
 
@@ -95,7 +107,7 @@ TripID не гарантированно уникален: точность ге
 
 После создания строк Warehouse Control передаёт `TripID` и `Route` во внешнюю библиотеку `InterstateBol`. BOL queue, registry, PDF URL и lifecycle BOL хранятся не в Warehouse Control spreadsheet, а в отдельном BOL-сервисе.
 
-### 2.5 Unloading result — `Receiving`
+### 2.6 Unloading result — `Receiving`
 
 Одна строка создаётся для каждого Order row выбранного TripID.
 
@@ -123,7 +135,7 @@ TripID не гарантированно уникален: точность ге
 
 Предполагаемая идентичность результата: `TripID + OrderID`, но constraint отсутствует. Наличие любой строки подходящего TripID используется как признак закрытого trip.
 
-### 2.6 Missing Item — `Missing`
+### 2.7 Missing Item — `Missing`
 
 | Поле | Тип | Обяз. | Источник |
 | --- | --- | ---: | --- |

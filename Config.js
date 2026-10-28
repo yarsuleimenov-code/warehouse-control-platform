@@ -1,6 +1,6 @@
 const SPREADSHEET_ID = '13gYc73705Q-HVUQxDWwLKdGU4ij6i0OUbdBiKoJnWuQ';
 const APP_TIMEZONE = 'America/New_York';
-const APP_VERSION = 'stage4-cleanup-2026-07-15';
+const APP_VERSION = 'stage6-loading-state-2026-09-24';
 
 const SHEETS = {
   users: 'Users',
@@ -26,6 +26,7 @@ const APP_CONFIGS = {
     sheets: {
       orders: 'Orders_NY',
       orderPieces: 'OrderPieces_NY',
+      orderLoadingState: 'OrderLoadingState',
       tripReports: 'TripReports',
     },
     trucks: TRUCKS,
@@ -44,6 +45,7 @@ const APP_CONFIGS = {
     sheets: {
       orders: 'Orders_CA',
       orderPieces: 'OrderPieces_CA',
+      orderLoadingState: 'OrderLoadingState',
       tripReports: 'TripReports',
     },
     trucks: TRUCKS,

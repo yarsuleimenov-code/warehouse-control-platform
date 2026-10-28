@@ -2,6 +2,7 @@ const ORDER_HEADER_ALIASES = {
   orderId: ['OrderID', 'ID'],
   title: ['Title'],
   excl: ['Excl'],
+  pickupZone: ['PickupZone', 'Pickup Zone'],
   zone: ['DeliveryZone', 'Delivery Zone', 'Zone'],
   volume: ['Volume'],
   deliveryDate: ['DeliveryDate', 'Delivery date', 'Date'],
@@ -10,7 +11,6 @@ const ORDER_HEADER_ALIASES = {
   weight: ['Weight'],
   loaded: ['Loaded'],
   piecesTotal: ['PiecesTotal', 'Pieces'],
-  loadedPieces: ['LoadedPieces'],
 };
 
 const ORDER_PIECES_HEADERS = [
@@ -22,6 +22,14 @@ const ORDER_PIECES_HEADERS = [
   'UpdatedAt',
   'LoadedBy',
   'TripID',
+];
+
+const ORDER_LOADING_STATE_HEADERS = [
+  'Branch',
+  'OrderID',
+  'PiecesTotal',
+  'UpdatedAt',
+  'UpdatedBy',
 ];
 
 const TRIP_REPORT_HEADERS = [
@@ -68,12 +76,13 @@ function getLoadingData(contextKey) {
   var ordersSheet = getRequiredSheet_(config.sheets.orders);
   var orderRead = readOrders_(ordersSheet);
   var piecesMap = getOrderPiecesMap_(config);
+  var orderLoadingStateMap = getOrderLoadingStateMap_(config);
   var tripStateMap = getTripStateMap_(config);
   var orders = [];
 
   for (var i = 0; i < orderRead.rows.length; i++) {
     var row = orderRead.rows[i];
-    var order = buildOrder_(row, i + 2, orderRead.headerMap, piecesMap, tripStateMap);
+    var order = buildOrder_(row, i + 2, orderRead.headerMap, piecesMap, tripStateMap, orderLoadingStateMap);
     if (order) orders.push(order);
   }
 
@@ -84,6 +93,7 @@ function getLoadingData(contextKey) {
     diagnostics: {
       orders: orders.length,
       piecesRows: countSheetRows_(config.sheets.orderPieces),
+      loadingStateRows: countSheetRows_(config.sheets.orderLoadingState),
     },
   };
 }
@@ -92,32 +102,39 @@ function getLoadingPieces(contextKey, orderId) {
   var config = getLoadingConfig_(contextKey);
   ensureLoadingSupportSheets_(config);
 
-  var order = findOrderById_(config, orderId);
-  if (!order) {
-    throw new Error('Order not found: ' + orderId);
-  }
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
 
-  if (!order.piecesTotal) {
+  try {
+    var order = findOrderById_(config, orderId);
+    if (!order) {
+      throw new Error('Order not found: ' + orderId);
+    }
+
+    if (!order.piecesTotal) {
+      return {
+        orderId: String(orderId),
+        piecesTotal: null,
+        pieces: [],
+      };
+    }
+
+    ensurePiecesForOrder_(config, order.orderId, order.piecesTotal);
+
     return {
-      orderId: String(orderId),
-      piecesTotal: null,
-      pieces: [],
+      orderId: order.orderId,
+      piecesTotal: order.piecesTotal,
+      pieces: getPiecesForOrder_(config, order.orderId)
+        .filter(function(piece) {
+          return piece.pieceNumber <= order.piecesTotal || piece.loaded;
+        })
+        .sort(function(a, b) {
+          return a.pieceNumber - b.pieceNumber;
+        }),
     };
+  } finally {
+    lock.releaseLock();
   }
-
-  ensurePiecesForOrder_(config, order.orderId, order.piecesTotal);
-
-  return {
-    orderId: order.orderId,
-    piecesTotal: order.piecesTotal,
-    pieces: getPiecesForOrder_(config, order.orderId)
-      .filter(function(piece) {
-        return piece.pieceNumber <= order.piecesTotal || piece.loaded;
-      })
-      .sort(function(a, b) {
-        return a.pieceNumber - b.pieceNumber;
-      }),
-  };
 }
 
 function saveLoadingChanges(contextKey, payload) {
@@ -127,9 +144,16 @@ function saveLoadingChanges(contextKey, payload) {
   payload = payload || {};
   assertUserAccess_(payload.username || '', contextKey);
 
-  savePiecesTotalUpdates_(config, payload.piecesInputs || []);
-  saveUnknownLoadedUpdates_(config, payload.unknownUpdates || []);
-  saveLoadedPieceUpdates_(config, payload.pieceUpdates || [], payload.username || '');
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+
+  try {
+    savePiecesTotalUpdates_(config, payload.piecesInputs || [], payload.username || '');
+    saveUnknownLoadedUpdates_(config, payload.unknownUpdates || [], payload.username || '');
+    saveLoadedPieceUpdates_(config, payload.pieceUpdates || [], payload.username || '');
+  } finally {
+    lock.releaseLock();
+  }
 
   return {
     success: true,
@@ -195,8 +219,8 @@ function generateLoadingTrip(contextKey, truck, username) {
       generatedAt: generatedAt,
       branch: config.branch,
       route: config.route,
-      departureWarehouse: config.departureWarehouse || '',
-      destinationWarehouse: config.destinationWarehouse || '',
+      departureWarehouse: summarizeTripWarehouses_(tripRows, 18, config.departureWarehouse),
+      destinationWarehouse: summarizeTripWarehouses_(tripRows, 19, config.destinationWarehouse),
       user: username || '',
       truck: truck,
       rows: tripRows.length,
@@ -269,6 +293,7 @@ function getLoadingConfig_(contextKey) {
 
 function ensureLoadingSupportSheets_(config) {
   ensureSheetWithHeaders_(config.sheets.orderPieces, ORDER_PIECES_HEADERS);
+  ensureSheetWithHeaders_(config.sheets.orderLoadingState, ORDER_LOADING_STATE_HEADERS);
   ensureTripReportsSheet_(config.sheets.tripReports);
 }
 
@@ -311,37 +336,32 @@ function buildOrderHeaderMap_(headers) {
   return map;
 }
 
-function buildOrder_(row, rowNumber, headerMap, piecesMap, tripStateMap) {
+function buildOrder_(row, rowNumber, headerMap, piecesMap, tripStateMap, orderLoadingStateMap) {
   var orderId = getCell_(row, headerMap.orderId);
   if (!orderId) return null;
 
   var color = normalizeColor_(getCell_(row, headerMap.colorCode));
   if (!color) return null;
 
-  var piecesTotal = normalizePositiveInt_(getCell_(row, headerMap.piecesTotal));
-  var loadedPieceNumbers = [];
-  var loadedPieces = 0;
-
-  if (piecesTotal) {
-    loadedPieceNumbers = (piecesMap[String(orderId)] || [])
-      .filter(function(piece) {
-        return piece.loaded;
-      })
-      .map(function(piece) {
-        return piece.pieceNumber;
-      })
-      .sort(function(a, b) {
-        return a - b;
-      });
-    loadedPieces = loadedPieceNumbers.length;
-  } else {
-    loadedPieces = Math.max(0, toNumber_(getCell_(row, headerMap.loadedPieces)));
-  }
+  var sourcePiecesTotal = getCell_(row, headerMap.piecesTotal);
+  var piecesTotal = resolvePiecesTotal_(orderId, sourcePiecesTotal, orderLoadingStateMap);
+  var loadedPieceNumbers = (piecesMap[String(orderId)] || [])
+    .filter(function(piece) {
+      return piece.loaded;
+    })
+    .map(function(piece) {
+      return piece.pieceNumber;
+    })
+    .sort(function(a, b) {
+      return a - b;
+    });
+  var loadedPieces = loadedPieceNumbers.length;
 
   return {
     row: rowNumber,
     orderId: String(orderId),
     title: getCell_(row, headerMap.title) || '',
+    pickupZone: getCell_(row, headerMap.pickupZone) || '',
     zone: getCell_(row, headerMap.zone) || '',
     volume: toNumber_(getCell_(row, headerMap.volume)),
     deliveryDate: formatDate_(getCell_(row, headerMap.deliveryDate)),
@@ -349,7 +369,7 @@ function buildOrder_(row, rowNumber, headerMap, piecesMap, tripStateMap) {
     color: color,
     weight: toNumber_(getCell_(row, headerMap.weight)),
     piecesTotal: piecesTotal,
-    piecesInput: getCell_(row, headerMap.piecesTotal) || '',
+    piecesInput: piecesTotal || '',
     loadedPieces: loadedPieces,
     loadedPieceNumbers: loadedPieceNumbers,
     status: getLoadingStatus_(piecesTotal, loadedPieces),
@@ -361,15 +381,47 @@ function findOrderById_(config, orderId) {
   var sheet = getRequiredSheet_(config.sheets.orders);
   var read = readOrders_(sheet);
   var piecesMap = getOrderPiecesMap_(config);
+  var orderLoadingStateMap = getOrderLoadingStateMap_(config);
 
   for (var i = 0; i < read.rows.length; i++) {
-    var order = buildOrder_(read.rows[i], i + 2, read.headerMap, piecesMap, {});
+    var order = buildOrder_(read.rows[i], i + 2, read.headerMap, piecesMap, {}, orderLoadingStateMap);
     if (order && order.orderId === String(orderId)) {
       return order;
     }
   }
 
   return null;
+}
+
+function resolvePiecesTotal_(orderId, sourcePiecesTotal, orderLoadingStateMap) {
+  var key = String(orderId);
+  var stateMap = orderLoadingStateMap || {};
+
+  if (Object.prototype.hasOwnProperty.call(stateMap, key)) {
+    return normalizePositiveInt_(stateMap[key]);
+  }
+
+  return normalizePositiveInt_(sourcePiecesTotal);
+}
+
+function getOrderLoadingStateMap_(config) {
+  var sheet = getRequiredSheet_(config.sheets.orderLoadingState);
+  var lastRow = sheet.getLastRow();
+  var map = {};
+
+  if (lastRow < 2) return map;
+
+  var values = sheet.getRange(2, 1, lastRow - 1, ORDER_LOADING_STATE_HEADERS.length).getValues();
+  values.forEach(function(row) {
+    if (String(row[0]) !== config.branch) return;
+
+    var orderId = String(row[1] || '');
+    if (!orderId) return;
+
+    map[orderId] = Math.max(0, Math.floor(Number(row[2]) || 0));
+  });
+
+  return map;
 }
 
 function getOrderPiecesMap_(config) {
@@ -437,46 +489,105 @@ function ensurePiecesForOrder_(config, orderId, piecesTotal) {
   }
 }
 
-function savePiecesTotalUpdates_(config, updates) {
+function savePiecesTotalUpdates_(config, updates, username) {
   if (!Array.isArray(updates) || !updates.length) return;
 
-  var sheet = getRequiredSheet_(config.sheets.orders);
-  var read = readOrders_(sheet);
-  if (read.headerMap.piecesTotal === undefined) {
-    throw new Error('Pieces column not found in ' + config.sheets.orders);
-  }
+  var ordersSheet = getRequiredSheet_(config.sheets.orders);
+  var read = readOrders_(ordersSheet);
+  var knownOrders = {};
+  read.rows.forEach(function(row) {
+    var orderId = String(getCell_(row, read.headerMap.orderId) || '');
+    if (orderId) knownOrders[orderId] = true;
+  });
+
+  var normalizedByOrder = {};
 
   updates.forEach(function(update) {
-    var rowNumber = Number(update.row);
-    if (!Number.isFinite(rowNumber) || rowNumber < 2) return;
+    var orderId = String(update.orderId || '');
+    if (!orderId) return;
+    if (!knownOrders[orderId]) {
+      throw new Error('Order changed or no longer exists. Refresh and retry: ' + orderId);
+    }
 
     var value = update.pieces === '' || update.pieces === null || update.pieces === undefined
-      ? ''
+      ? 0
       : Math.max(0, Math.floor(Number(update.pieces) || 0));
 
-    sheet.getRange(rowNumber, read.headerMap.piecesTotal + 1).setValue(value || '');
+    normalizedByOrder[orderId] = value;
+  });
+
+  var orderIds = Object.keys(normalizedByOrder);
+  if (!orderIds.length) return;
+
+  var stateSheet = getRequiredSheet_(config.sheets.orderLoadingState);
+  var lastRow = stateSheet.getLastRow();
+  var values = lastRow >= 2
+    ? stateSheet.getRange(2, 1, lastRow - 1, ORDER_LOADING_STATE_HEADERS.length).getValues()
+    : [];
+  var rowByKey = {};
+
+  values.forEach(function(row, index) {
+    rowByKey[String(row[0]) + '::' + String(row[1])] = index;
+  });
+
+  var updatedAt = formatDateTime_(new Date());
+  orderIds.forEach(function(orderId) {
+    var value = normalizedByOrder[orderId];
+    var key = config.branch + '::' + orderId;
+    var index = rowByKey[key];
+    var stateRow = [config.branch, orderId, value, updatedAt, username || ''];
+
+    if (index === undefined) {
+      values.push(stateRow);
+      rowByKey[key] = values.length - 1;
+    } else {
+      values[index] = stateRow;
+    }
 
     if (value > 0) {
-      ensurePiecesForOrder_(config, update.orderId, value);
+      ensurePiecesForOrder_(config, orderId, value);
     }
   });
+
+  stateSheet.getRange(2, 1, values.length, ORDER_LOADING_STATE_HEADERS.length).setValues(values);
 }
 
-function saveUnknownLoadedUpdates_(config, updates) {
+function saveUnknownLoadedUpdates_(config, updates, username) {
   if (!Array.isArray(updates) || !updates.length) return;
 
-  var sheet = getRequiredSheet_(config.sheets.orders);
-  var read = readOrders_(sheet);
-  if (read.headerMap.loadedPieces === undefined) {
-    throw new Error('LoadedPieces column not found in ' + config.sheets.orders);
-  }
+  var piecesMap = getOrderPiecesMap_(config);
+  var pieceUpdates = [];
 
   updates.forEach(function(update) {
-    var rowNumber = Number(update.row);
-    if (!Number.isFinite(rowNumber) || rowNumber < 2) return;
+    var orderId = String(update.orderId || '');
+    if (!orderId) return;
 
-    sheet.getRange(rowNumber, read.headerMap.loadedPieces + 1).setValue(Math.max(0, Math.floor(Number(update.loadedPieces) || 0)));
+    var desiredLoadedPieces = Math.max(0, Math.floor(Number(update.loadedPieces) || 0));
+    var existingPieces = piecesMap[orderId] || [];
+    var existingByNumber = {};
+    var maxPieceNumber = desiredLoadedPieces;
+
+    existingPieces.forEach(function(piece) {
+      existingByNumber[piece.pieceNumber] = piece;
+      maxPieceNumber = Math.max(maxPieceNumber, piece.pieceNumber);
+    });
+
+    for (var pieceNumber = 1; pieceNumber <= maxPieceNumber; pieceNumber++) {
+      var existing = existingByNumber[pieceNumber];
+      var loaded = pieceNumber <= desiredLoadedPieces;
+
+      if (existing && existing.loaded === loaded) continue;
+      if (!existing && !loaded) continue;
+
+      pieceUpdates.push({
+        orderId: orderId,
+        pieceNumber: pieceNumber,
+        loaded: loaded,
+      });
+    }
   });
+
+  saveLoadedPieceUpdates_(config, pieceUpdates, username || '');
 }
 
 function saveLoadedPieceUpdates_(config, updates, username) {
@@ -628,6 +739,9 @@ function getRemainingCountPieces_(order, reported, countPieces) {
 }
 
 function buildTripRow_(config, tripId, generatedAt, username, truck, order, loadedPieces, remainingPieces, status, countPieces, remainingCountPieces) {
+  var departureWarehouse = resolveDepartureWarehouse_(order.pickupZone || config.branch, config.departureWarehouse);
+  var destinationWarehouse = resolveDestinationWarehouse_(order.zone, config.destinationWarehouse);
+
   return [
     tripId,
     generatedAt,
@@ -647,9 +761,42 @@ function buildTripRow_(config, tripId, generatedAt, username, truck, order, load
     status,
     countPieces || '',
     remainingCountPieces || '',
-    config.departureWarehouse || '',
-    config.destinationWarehouse || '',
+    departureWarehouse,
+    destinationWarehouse,
   ];
+}
+
+function resolveDepartureWarehouse_(pickupZone, currentWarehouse) {
+  return isNyZone_(pickupZone) ? 'NJ1' : currentWarehouse || '';
+}
+
+function resolveDestinationWarehouse_(deliveryZone, currentWarehouse) {
+  var zone = normalizeZone_(deliveryZone);
+
+  if (zone === 'CA (SF)') return 'CA2';
+  if (/^CA\b/.test(zone)) return 'CA1';
+  if (isNyZone_(zone)) return 'NJ1';
+
+  return currentWarehouse || '';
+}
+
+function isNyZone_(zone) {
+  return /^NY(?:C\b|\b)/.test(normalizeZone_(zone));
+}
+
+function normalizeZone_(zone) {
+  return String(zone || '').trim().replace(/\s+/g, ' ').toUpperCase();
+}
+
+function summarizeTripWarehouses_(tripRows, columnIndex, fallback) {
+  var warehouses = [];
+
+  (tripRows || []).forEach(function(row) {
+    var warehouse = String(row[columnIndex] || '');
+    if (warehouse && warehouses.indexOf(warehouse) === -1) warehouses.push(warehouse);
+  });
+
+  return warehouses.length ? warehouses.join(' / ') : fallback || '';
 }
 
 function appendRows_(sheetName, headers, rows) {
